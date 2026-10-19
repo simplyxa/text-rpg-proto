@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: text-rpg-proto
+    env: docker
+    plan: free
+    branch: main
+    buildCommand: ""
+    startCommand: ""
+    envVars:
+      - key: PORT
+        value: "3000"
