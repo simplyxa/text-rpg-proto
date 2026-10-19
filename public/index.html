@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Text RPG Prototype</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="app">
+    <h1>Text RPG (прототип)</h1>
+
+    <div id="create">
+      <input id="name" placeholder="Имя персонажа" />
+      <select id="class">
+        <option value="warrior">Воин</option>
+        <option value="rogue">Разбойник</option>
+        <option value="mage">Маг</option>
+      </select>
+      <button id="createBtn">Создать</button>
+      <button id="loadBtn">Загрузить</button>
+    </div>
+
+    <div id="game" style="display:none;">
+      <div id="stats"></div>
+      <div id="controls">
+        <button id="travelTown">В город</button>
+        <button id="travelForest">В лес</button>
+        <button id="travelCave">В пещеру</button>
+        <button id="fightBtn">Атаковать</button>
+        <button id="invBtn">Инвентарь</button>
+      </div>
+      <div id="log"></div>
+    </div>
+
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
