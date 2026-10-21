@@ -15,22 +15,51 @@
           <h1>RPG World</h1>
         </div>
 
-        <div class="auth-form">
-          <label>
-            <span>Имя героя</span>
-            <input id="name" type="text" placeholder="Например: Артур" maxlength="24" />
-          </label>
+        <div class="auth-columns">
+          <div class="auth-panel">
+            <h3>Новый персонаж</h3>
+            <div class="auth-form">
+              <label>
+                <span>Ник</span>
+                <input id="newNickname" type="text" placeholder="Например: Arterion" maxlength="24" />
+              </label>
 
-          <label>
-            <span>Класс</span>
-            <select id="class">
-              <option value="warrior">Воин</option>
-              <option value="rogue">Разбойник</option>
-              <option value="mage">Маг</option>
-            </select>
-          </label>
+              <label>
+                <span>Класс</span>
+                <select id="newClass">
+                  <option value="warrior">Воин</option>
+                  <option value="rogue">Разбойник</option>
+                  <option value="mage">Маг</option>
+                </select>
+              </label>
 
-          <button id="createBtn" class="primary-btn">Создать персонажа</button>
+              <label>
+                <span>Пароль</span>
+                <input id="newPassword" type="password" placeholder="Минимум 4 символа" maxlength="32" />
+              </label>
+
+              <button id="createBtn" class="primary-btn">Создать персонажа</button>
+              <small class="helper-text">Советуем завести пароль к 10 уровню.</small>
+              <button id="startGameBtn" class="secondary-btn hidden">Начать игру</button>
+            </div>
+          </div>
+
+          <div class="auth-panel">
+            <h3>Вход для героя</h3>
+            <div class="auth-form login-form">
+              <label>
+                <span>Ник</span>
+                <input id="loginNickname" type="text" placeholder="Ваш ник" maxlength="24" />
+              </label>
+
+              <label>
+                <span>Пароль</span>
+                <input id="loginPassword" type="password" placeholder="Пароль" maxlength="32" />
+              </label>
+
+              <button id="loginBtn" class="primary-btn">Войти</button>
+            </div>
+          </div>
         </div>
 
         <div class="heroes-box">

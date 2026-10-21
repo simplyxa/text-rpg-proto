@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const cors = require('cors');
+const crypto = require('crypto');
 const Database = require('better-sqlite3');
 
 const DB_FILE = path.join(__dirname, 'rpg.db');
@@ -12,6 +13,17 @@ function randInt(min, max) {
 
 function uid() {
   return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(String(password)).digest('hex');
+}
+
+function stripPassword(character) {
+  if (!character) return null;
+  const copy = { ...character };
+  delete copy.passwordHash;
+  return copy;
 }
 
 function createDefaultQuests() {
@@ -39,7 +51,7 @@ function createDefaultQuests() {
   ];
 }
 
-function buildCharacter(name, classId, id = uid()) {
+function buildCharacter(name, classId, passwordHash, id = uid()) {
   const base = { hp: 30, str: 5, agi: 4, int: 3 };
   if (classId === 'warrior') base.str += 2;
   if (classId === 'rogue') base.agi += 2;
@@ -65,6 +77,7 @@ function buildCharacter(name, classId, id = uid()) {
       { id: 'food', name: 'Пирожок', qty: 1, heal: 8 }
     ],
     quests: createDefaultQuests(),
+    passwordHash: passwordHash || null,
     createdAt: Date.now()
   };
 }
@@ -101,6 +114,7 @@ function serializeCharacter(character) {
     kills: character.kills,
     inventory: JSON.stringify(character.inventory || []),
     quests: JSON.stringify(character.quests || []),
+    passwordHash: character.passwordHash || null,
     createdAt: character.createdAt || Date.now()
   };
 }
@@ -124,6 +138,7 @@ function deserializeCharacter(row) {
     kills: row.kills,
     inventory: JSON.parse(row.inventory || '[]'),
     quests: JSON.parse(row.quests || JSON.stringify(createDefaultQuests())),
+    passwordHash: row.passwordHash || null,
     createdAt: row.createdAt
   };
 }
@@ -148,9 +163,17 @@ function openDatabase() {
       kills INTEGER,
       inventory TEXT,
       quests TEXT,
+      passwordHash TEXT,
       createdAt INTEGER
     )
   `);
+
+  const cols = db.prepare('PRAGMA table_info(characters)').all();
+  const hasPassword = cols.some((col) => col.name === 'passwordHash');
+  if (!hasPassword) {
+    db.exec('ALTER TABLE characters ADD COLUMN passwordHash TEXT');
+  }
+
   return db;
 }
 
@@ -175,8 +198,8 @@ async function saveCharacter(character) {
   const row = serializeCharacter(character);
   dbRun(
     `INSERT OR REPLACE INTO characters (
-      id, name, classId, level, xp, xpToNext, maxHp, hp, str, agi, int, gold, location, kills, inventory, quests, createdAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, name, classId, level, xp, xpToNext, maxHp, hp, str, agi, int, gold, location, kills, inventory, quests, passwordHash, createdAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.id,
       row.name,
@@ -194,6 +217,7 @@ async function saveCharacter(character) {
       row.kills,
       row.inventory,
       row.quests,
+      row.passwordHash,
       row.createdAt
     ]
   );
@@ -201,12 +225,17 @@ async function saveCharacter(character) {
 
 async function listCharacters() {
   const rows = dbAll('SELECT * FROM characters ORDER BY createdAt DESC');
-  return rows.map(deserializeCharacter);
+  return rows.map((row) => stripPassword(deserializeCharacter(row)));
 }
 
 async function loadCharacterById(id) {
   const row = dbGet('SELECT * FROM characters WHERE id = ?', [id]);
-  return deserializeCharacter(row);
+  return stripPassword(deserializeCharacter(row));
+}
+
+async function loadCharacterByName(name) {
+  const row = dbGet('SELECT * FROM characters WHERE name = ?', [name]);
+  return stripPassword(deserializeCharacter(row));
 }
 
 const app = express();
@@ -243,16 +272,47 @@ app.get('/api/locations', (req, res) => {
   ]);
 });
 
-app.post('/api/createCharacter', async (req, res) => {
-  const { name, classId } = req.body;
-  if (!name || !name.trim()) return res.status(400).json({ error: 'Нужно имя персонажа.' });
+app.post('/api/registerCharacter', async (req, res) => {
+  const { nickname, classId, password } = req.body;
+  const cleanName = String(nickname || '').trim();
 
-  const cleanName = name.trim();
+  if (!cleanName) return res.status(400).json({ error: 'Введите уникальный ник.' });
+  if (cleanName.length < 3) return res.status(400).json({ error: 'Ник должен быть не короче 3 символов.' });
+
+  const passwordValue = String(password || '').trim();
+  if (!passwordValue) return res.status(400).json({ error: 'Придумайте пароль для входа.' });
+  if (passwordValue.length < 4) return res.status(400).json({ error: 'Пароль должен содержать минимум 4 символа.' });
+
+  const existing = dbGet('SELECT id FROM characters WHERE name = ?', [cleanName]);
+  if (existing) return res.status(409).json({ error: 'Такой ник уже занят.' });
+
   const classMap = ['warrior', 'rogue', 'mage'];
   const finalClass = classMap.includes(classId) ? classId : 'warrior';
 
-  const character = buildCharacter(cleanName, finalClass);
+  const character = buildCharacter(cleanName, finalClass, hashPassword(passwordValue));
   await saveCharacter(character);
+  res.json({ character: stripPassword(character), notice: 'Советуем придумать пароль к 10 уровню и не хранить его в открытом виде.' });
+});
+
+app.post('/api/loginCharacter', async (req, res) => {
+  const { nickname, password } = req.body;
+  const cleanName = String(nickname || '').trim();
+  const passwordValue = String(password || '').trim();
+
+  if (!cleanName || !passwordValue) {
+    return res.status(400).json({ error: 'Введите ник и пароль.' });
+  }
+
+  const row = dbGet('SELECT * FROM characters WHERE name = ?', [cleanName]);
+  if (!row) return res.status(404).json({ error: 'Персонаж не найден.' });
+
+  const stored = deserializeCharacter(row);
+  const expectedHash = hashPassword(passwordValue);
+  if (stored.passwordHash !== expectedHash) {
+    return res.status(401).json({ error: 'Неверный пароль.' });
+  }
+
+  const character = stripPassword(stored);
   res.json({ character });
 });
 
@@ -265,7 +325,7 @@ app.get('/api/character', async (req, res) => {
 
   updateQuests(char);
   await saveCharacter(char);
-  res.json({ character: char });
+  res.json({ character: stripPassword(char) });
 });
 
 app.post('/api/travel', async (req, res) => {
@@ -282,12 +342,12 @@ app.post('/api/travel', async (req, res) => {
 
   char.location = to;
   await saveCharacter(char);
-  res.json({ location: loc, character: char });
+  res.json({ location: loc, character: stripPassword(char) });
 });
 
 app.post('/api/fight', async (req, res) => {
   const { id } = req.body;
-  const char = await loadCharacterById(id);
+  let char = await loadCharacterById(id);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
 
   const locs = [
@@ -298,7 +358,7 @@ app.post('/api/fight', async (req, res) => {
   const loc = locs.find((l) => l.id === char.location);
 
   if (!loc || !loc.monsters || loc.monsters.length === 0) {
-    return res.json({ message: 'Здесь нет врагов.', character: char });
+    return res.json({ message: 'Здесь нет врагов.', character: stripPassword(char) });
   }
 
   const monsters = {
@@ -364,7 +424,7 @@ app.post('/api/fight', async (req, res) => {
     }
 
     await saveCharacter(char);
-    return res.json({ victory: true, log, character: char });
+    return res.json({ victory: true, log, character: stripPassword(char) });
   }
 
   char.hp = Math.max(1, Math.floor(char.maxHp / 2));
@@ -373,7 +433,7 @@ app.post('/api/fight', async (req, res) => {
   log.push(`${char.name} был(а) побежден(а), отступил(а) в город и потерял(а) часть золота.`);
 
   await saveCharacter(char);
-  res.json({ victory: false, log, character: char });
+  res.json({ victory: false, log, character: stripPassword(char) });
 });
 
 app.get('/api/inventory', async (req, res) => {
@@ -397,7 +457,7 @@ app.post('/api/useItem', async (req, res) => {
     item.qty -= 1;
     if (item.qty <= 0) char.inventory.splice(idx, 1);
     await saveCharacter(char);
-    return res.json({ message: `Использован ${item.name}. Восстановлено ${healed} HP.`, character: char });
+    return res.json({ message: `Использован ${item.name}. Восстановлено ${healed} HP.`, character: stripPassword(char) });
   }
 
   return res.status(400).json({ error: 'Этот предмет нельзя использовать.' });
@@ -425,7 +485,7 @@ app.post('/api/buyPotion', async (req, res) => {
   else char.inventory.push({ id: 'potion', name: 'Зелье лечения', qty: 1, heal: 15 });
 
   await saveCharacter(char);
-  res.json({ message: 'Куплено зелье лечения.', character: char });
+  res.json({ message: 'Куплено зелье лечения.', character: stripPassword(char) });
 });
 
 const PORT = process.env.PORT || 3000;

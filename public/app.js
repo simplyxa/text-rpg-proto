@@ -6,9 +6,15 @@ let currentCharacter = null;
 const authScreen = document.getElementById('authScreen');
 const gameDiv = document.getElementById('game');
 
-const nameInput = document.getElementById('name');
-const classInput = document.getElementById('class');
+const newNicknameInput = document.getElementById('newNickname');
+const newClassInput = document.getElementById('newClass');
+const newPasswordInput = document.getElementById('newPassword');
 const createBtn = document.getElementById('createBtn');
+const startGameBtn = document.getElementById('startGameBtn');
+
+const loginNicknameInput = document.getElementById('loginNickname');
+const loginPasswordInput = document.getElementById('loginPassword');
+const loginBtn = document.getElementById('loginBtn');
 
 const statsDiv = document.getElementById('stats');
 const logDiv = document.getElementById('log');
@@ -73,7 +79,7 @@ function renderCharacter(c) {
 
   profileContent.innerHTML = `
     <h3>Профиль героя</h3>
-    <p><strong>Имя:</strong> ${c.name}</p>
+    <p><strong>Ник:</strong> ${c.name}</p>
     <p><strong>Класс:</strong> ${c.classId}</p>
     <p><strong>Уровень:</strong> ${c.level}</p>
     <p><strong>HP:</strong> ${c.hp}/${c.maxHp}</p>
@@ -108,9 +114,11 @@ function renderCharacterList(list) {
     item.onclick = async () => {
       const res = await api(`/api/character?id=${encodeURIComponent(char.id)}`);
       if (res.error) return alert(res.error);
-      renderCharacter(res.character);
+      currentCharacter = res.character;
+      currentId = res.character.id;
+      startGameBtn.classList.remove('hidden');
       setActiveTab('profile');
-      setLog('Герой загружен.');
+      setLog('Герой загружен. Нажмите «Начать игру».');
     };
 
     characterListDiv.appendChild(item);
@@ -125,24 +133,53 @@ async function loadCharacters() {
 }
 
 async function createCharacter() {
-  const name = nameInput.value.trim();
-  const classId = classInput.value;
+  const nickname = newNicknameInput.value.trim();
+  const classId = newClassInput.value;
+  const password = newPasswordInput.value.trim();
 
-  if (!name) return alert('Введите имя героя');
+  if (!nickname) return alert('Введите уникальный ник');
+  if (!password) return alert('Придумайте пароль');
 
-  const res = await api('/api/createCharacter', {
+  const res = await api('/api/registerCharacter', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, classId })
+    body: JSON.stringify({ nickname, classId, password })
   });
 
   if (res.error) return alert(res.error);
 
+  currentCharacter = res.character;
   currentId = res.character.id;
-  renderCharacter(res.character);
-  setActiveTab('profile');
-  setLog('Персонаж создан. Добро пожаловать в мир.');
+  startGameBtn.classList.remove('hidden');
+  setLog('Персонаж создан. Нажмите «Начать игру».');
   await loadCharacters();
+}
+
+async function loginCharacter() {
+  const nickname = loginNicknameInput.value.trim();
+  const password = loginPasswordInput.value.trim();
+
+  if (!nickname || !password) return alert('Введите ник и пароль');
+
+  const res = await api('/api/loginCharacter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nickname, password })
+  });
+
+  if (res.error) return alert(res.error);
+
+  currentCharacter = res.character;
+  currentId = res.character.id;
+  startGameBtn.classList.remove('hidden');
+  setLog('Вход выполнен. Нажмите «Начать игру».');
+}
+
+async function startSelectedGame() {
+  if (!currentCharacter || !currentId) return alert('Сначала выберите или создайте персонажа');
+  renderCharacter(currentCharacter);
+  setActiveTab('profile');
+  startGameBtn.classList.add('hidden');
 }
 
 async function travel(to) {
@@ -156,6 +193,7 @@ async function travel(to) {
 
   if (res.error) return alert(res.error);
 
+  currentCharacter = res.character;
   renderCharacter(res.character);
   setLog(`Вы переместились в ${res.location.name}. ${res.location.description}`);
 }
@@ -172,7 +210,10 @@ async function fight() {
   if (res.error) return alert(res.error);
 
   if (res.log) setLog(res.log.join('\n'));
-  if (res.character) renderCharacter(res.character);
+  if (res.character) {
+    currentCharacter = res.character;
+    renderCharacter(res.character);
+  }
 
   if (res.victory === true) {
     appendLog('\nПобеда! Вы получили награду.');
@@ -216,6 +257,7 @@ async function renderInventoryTab() {
 
       if (useRes.error) return alert(useRes.error);
       setLog(useRes.message || 'Предмет использован');
+      currentCharacter = useRes.character;
       renderCharacter(useRes.character);
       renderInventoryTab();
     };
@@ -244,7 +286,7 @@ async function renderQuestsTab() {
       <div class="quest-name">
         <strong>${q.title}</strong><br>
         ${q.description}<br>
-        ${q.progress}/${q.target} • ${q.done ? '��ыполнено' : 'В процессе'}
+        ${q.progress}/${q.target} • ${q.done ? 'Выполнено' : 'В процессе'}
       </div>
     </div>
   `).join('');
@@ -272,6 +314,7 @@ async function renderShopTab() {
 
     if (res.error) return alert(res.error);
     setLog(res.message || 'Покупка совершена.');
+    currentCharacter = res.character;
     renderCharacter(res.character);
     renderShopTab();
     renderInventoryTab();
@@ -295,6 +338,8 @@ async function loadWorld() {
 }
 
 createBtn.onclick = createCharacter;
+loginBtn.onclick = loginCharacter;
+startGameBtn.onclick = startSelectedGame;
 
 fightBtn.onclick = fight;
 invBtn.onclick = async () => {
@@ -322,6 +367,7 @@ tabButtons.forEach((btn) => {
 
 loadWorld();
 loadCharacters();
-setLog('Добро пожаловать. Создайте или выберите героя.');
+setLog('Добро пожаловать. Создайте героя или войдите по нику и паролю.');
 showAuthScreen();
 setActiveTab('profile');
+startGameBtn.classList.add('hidden');
