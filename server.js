@@ -26,6 +26,7 @@ function stripPassword(character) {
   if (!character) return null;
   const copy = { ...character };
   delete copy.passwordHash;
+  delete copy.passwordhash;
   return copy;
 }
 
@@ -124,14 +125,23 @@ function serializeCharacter(character) {
 
 function deserializeCharacter(row) {
   if (!row) return null;
+
+  const inventory = Array.isArray(row.inventory)
+    ? row.inventory
+    : (typeof row.inventory === 'string' ? JSON.parse(row.inventory || '[]') : []);
+
+  const quests = Array.isArray(row.quests)
+    ? row.quests
+    : (typeof row.quests === 'string' ? JSON.parse(row.quests || JSON.stringify(createDefaultQuests())) : createDefaultQuests());
+
   return {
     id: row.id,
     name: row.name,
-    classId: row.classId,
+    classId: row.classid || row.classId,
     level: row.level,
     xp: row.xp,
-    xpToNext: row.xpToNext,
-    maxHp: row.maxHp,
+    xpToNext: row.xptonext || row.xpToNext,
+    maxHp: row.maxhp || row.maxHp,
     hp: row.hp,
     str: row.str,
     agi: row.agi,
@@ -139,10 +149,10 @@ function deserializeCharacter(row) {
     gold: row.gold,
     location: row.location,
     kills: row.kills,
-    inventory: JSON.parse(row.inventory || '[]'),
-    quests: JSON.parse(row.quests || JSON.stringify(createDefaultQuests())),
-    passwordHash: row.passwordHash || null,
-    createdAt: row.createdAt
+    inventory,
+    quests,
+    passwordHash: row.passwordhash || row.passwordHash,
+    createdAt: row.createdat || row.createdAt
   };
 }
 
@@ -151,15 +161,44 @@ async function initDatabase() {
     throw new Error('DATABASE_URL is not set.');
   }
 
-  await pool.query(`
+  const needed = [
+    'id TEXT',
+    'name TEXT',
+    'classid TEXT',
+    'level INTEGER',
+    'xp INTEGER',
+    'xptonext INTEGER',
+    'maxhp INTEGER',
+    'hp INTEGER',
+    'str INTEGER',
+    'agi INTEGER',
+    'int INTEGER',
+    'gold INTEGER',
+    'location TEXT',
+    'kills INTEGER',
+    'inventory TEXT',
+    'quests TEXT',
+    'passwordhash TEXT',
+    'createdat BIGINT'
+  ];
+
+  const columns = await pool.query(`
+    SELECT lower(column_name) AS column_name
+    FROM information_schema.columns
+    WHERE table_name = 'characters'
+  `);
+
+  const present = new Set(columns.rows.map((r) => r.column_name));
+
+  const createTableSql = `
     CREATE TABLE IF NOT EXISTS characters (
       id TEXT PRIMARY KEY,
       name TEXT,
-      classId TEXT,
+      classid TEXT,
       level INTEGER,
       xp INTEGER,
-      xpToNext INTEGER,
-      maxHp INTEGER,
+      xptonext INTEGER,
+      maxhp INTEGER,
       hp INTEGER,
       str INTEGER,
       agi INTEGER,
@@ -169,32 +208,18 @@ async function initDatabase() {
       kills INTEGER,
       inventory TEXT,
       quests TEXT,
-      passwordHash TEXT,
-      createdAt BIGINT
+      passwordhash TEXT,
+      createdat BIGINT
     )
-  `);
+  `;
 
-  const columns = await pool.query(`
-    SELECT column_name
-    FROM information_schema.columns
-    WHERE table_name = 'characters'
-  `);
+  await pool.query(createTableSql);
 
-  const present = new Set(columns.rows.map((r) => r.column_name));
-  const needed = [
-    'id', 'name', 'classId', 'level', 'xp', 'xpToNext', 'maxHp', 'hp',
-    'str', 'agi', 'int', 'gold', 'location', 'kills', 'inventory',
-    'quests', 'passwordHash', 'createdAt'
-  ];
-
-  for (const col of needed) {
-    if (!present.has(col)) {
-      const sql = `ALTER TABLE characters ADD COLUMN ${col} TEXT`;
-      if (col === 'level' || col === 'xp' || col === 'xpToNext' || col === 'maxHp' || col === 'hp' || col === 'str' || col === 'agi' || col === 'int' || col === 'gold' || col === 'kills' || col === 'createdAt') {
-        await pool.query(`ALTER TABLE characters ADD COLUMN ${col} INTEGER`);
-      } else if (col === 'id' || col === 'name' || col === 'classId' || col === 'location' || col === 'inventory' || col === 'quests' || col === 'passwordHash') {
-        await pool.query(`ALTER TABLE characters ADD COLUMN ${col} TEXT`);
-      }
+  for (const colDef of needed) {
+    const [columnName, columnType] = colDef.split(' ');
+    const normalized = columnName.toLowerCase();
+    if (!present.has(normalized)) {
+      await pool.query(`ALTER TABLE characters ADD COLUMN ${normalized} ${columnType}`);
     }
   }
 }
@@ -203,15 +228,15 @@ async function saveCharacter(character) {
   const row = serializeCharacter(character);
   await pool.query(
     `INSERT INTO characters (
-      id, name, classId, level, xp, xpToNext, maxHp, hp, str, agi, int, gold, location, kills, inventory, quests, passwordHash, createdAt
+      id, name, classid, level, xp, xptonext, maxhp, hp, str, agi, int, gold, location, kills, inventory, quests, passwordhash, createdat
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
-      classId = EXCLUDED.classId,
+      classid = EXCLUDED.classid,
       level = EXCLUDED.level,
       xp = EXCLUDED.xp,
-      xpToNext = EXCLUDED.xpToNext,
-      maxHp = EXCLUDED.maxHp,
+      xptonext = EXCLUDED.xptonext,
+      maxhp = EXCLUDED.maxhp,
       hp = EXCLUDED.hp,
       str = EXCLUDED.str,
       agi = EXCLUDED.agi,
@@ -221,8 +246,8 @@ async function saveCharacter(character) {
       kills = EXCLUDED.kills,
       inventory = EXCLUDED.inventory,
       quests = EXCLUDED.quests,
-      passwordHash = EXCLUDED.passwordHash,
-      createdAt = EXCLUDED.createdAt`,
+      passwordhash = EXCLUDED.passwordhash,
+      createdat = EXCLUDED.createdat`,
     [
       row.id,
       row.name,
@@ -247,7 +272,7 @@ async function saveCharacter(character) {
 }
 
 async function listCharacters() {
-  const result = await pool.query('SELECT * FROM characters ORDER BY createdAt DESC');
+  const result = await pool.query('SELECT * FROM characters ORDER BY createdat DESC');
   return result.rows.map((row) => stripPassword(deserializeCharacter(row)));
 }
 
@@ -481,7 +506,7 @@ app.post('/api/useItem', async (req, res) => {
     return res.json({ message: `Использован ${item.name}. Восстановлено ${healed} HP.`, character: stripPassword(char) });
   }
 
-  return res.status(400).json({ error: 'Этот предмет нельзя использовать.' });
+  return res.status(400).json({ error: '��тот предмет нельзя использовать.' });
 });
 
 app.get('/api/quests', async (req, res) => {
