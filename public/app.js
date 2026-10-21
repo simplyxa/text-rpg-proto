@@ -58,6 +58,11 @@ function clearSessionState() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+function logoutGame() {
+  clearSessionState();
+  window.location.href = '/';
+}
+
 function restoreSessionState() {
   try {
     const savedId = localStorage.getItem(STORAGE_ID_KEY);
@@ -155,7 +160,13 @@ function renderCharacter(c) {
     <p><strong>Опыт:</strong> ${c.xp}/${c.xpToNext}</p>
     <p><strong>Золото:</strong> ${c.gold}</p>
     <p><strong>Локация:</strong> ${c.location}</p>
+    <button id="logoutBtn" class="secondary-btn" type="button">Выйти</button>
   `;
+
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.onclick = logoutGame;
+  }
 
   gameStatus.textContent = `Игрок: ${c.name} • ${c.location} • Уровень ${c.level}`;
   showGameScreen();
