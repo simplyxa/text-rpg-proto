@@ -2,7 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const cors = require('cors');
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 
 const DB_FILE = path.join(__dirname, 'rpg.db');
 
@@ -129,65 +129,51 @@ function deserializeCharacter(row) {
 }
 
 function openDatabase() {
-  const db = new sqlite3.Database(DB_FILE);
-  db.serialize(() => {
-    db.run(`
-      CREATE TABLE IF NOT EXISTS characters (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        classId TEXT,
-        level INTEGER,
-        xp INTEGER,
-        xpToNext INTEGER,
-        maxHp INTEGER,
-        hp INTEGER,
-        str INTEGER,
-        agi INTEGER,
-        int INTEGER,
-        gold INTEGER,
-        location TEXT,
-        kills INTEGER,
-        inventory TEXT,
-        quests TEXT,
-        createdAt INTEGER
-      )
-    `);
-  });
+  const db = new Database(DB_FILE);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS characters (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      classId TEXT,
+      level INTEGER,
+      xp INTEGER,
+      xpToNext INTEGER,
+      maxHp INTEGER,
+      hp INTEGER,
+      str INTEGER,
+      agi INTEGER,
+      int INTEGER,
+      gold INTEGER,
+      location TEXT,
+      kills INTEGER,
+      inventory TEXT,
+      quests TEXT,
+      createdAt INTEGER
+    )
+  `);
   return db;
 }
 
 const db = openDatabase();
 
 function dbRun(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) return reject(err);
-      resolve({ lastID: this.lastID, changes: this.changes });
-    });
-  });
+  const stmt = db.prepare(sql);
+  return stmt.run(...params);
 }
 
 function dbGet(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) return reject(err);
-      resolve(row);
-    });
-  });
+  const stmt = db.prepare(sql);
+  return stmt.get(...params);
 }
 
 function dbAll(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
+  const stmt = db.prepare(sql);
+  return stmt.all(...params);
 }
 
 async function saveCharacter(character) {
   const row = serializeCharacter(character);
-  await dbRun(
+  dbRun(
     `INSERT OR REPLACE INTO characters (
       id, name, classId, level, xp, xpToNext, maxHp, hp, str, agi, int, gold, location, kills, inventory, quests, createdAt
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -214,12 +200,12 @@ async function saveCharacter(character) {
 }
 
 async function listCharacters() {
-  const rows = await dbAll('SELECT * FROM characters ORDER BY createdAt DESC');
+  const rows = dbAll('SELECT * FROM characters ORDER BY createdAt DESC');
   return rows.map(deserializeCharacter);
 }
 
 async function loadCharacterById(id) {
-  const row = await dbGet('SELECT * FROM characters WHERE id = ?', [id]);
+  const row = dbGet('SELECT * FROM characters WHERE id = ?', [id]);
   return deserializeCharacter(row);
 }
 
