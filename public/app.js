@@ -83,6 +83,10 @@ function restoreSessionState() {
   }
 }
 
+function goToCharacterPage() {
+  window.location.href = '/character.html';
+}
+
 function setLog(text) {
   logDiv.textContent = text;
 }
@@ -179,9 +183,7 @@ function renderCharacterList(list) {
       currentCharacter = res.character;
       currentId = res.character.id;
       saveSessionState();
-      startGameBtn.classList.remove('hidden');
-      setAuthMode('register');
-      setLog('Герой загружен. Нажмите «Начать игру».');
+      goToCharacterPage();
     };
 
     characterListDiv.appendChild(item);
@@ -214,9 +216,7 @@ async function createCharacter() {
   currentCharacter = res.character;
   currentId = res.character.id;
   saveSessionState();
-  startGameBtn.classList.remove('hidden');
-  setLog('Персонаж создан. Нажмите «Начать игру».');
-  await loadCharacters();
+  goToCharacterPage();
 }
 
 async function loginCharacter() {
@@ -236,8 +236,7 @@ async function loginCharacter() {
   currentCharacter = res.character;
   currentId = res.character.id;
   saveSessionState();
-  startGameBtn.classList.remove('hidden');
-  setLog('Вход выполнен. Нажмите «Начать игру».');
+  goToCharacterPage();
 }
 
 async function startSelectedGame() {
@@ -450,7 +449,6 @@ async function restoreSession() {
     return;
   }
 
-  currentCharacter = currentCharacter || { ...currentCharacter };
   renderCharacter(currentCharacter);
   setActiveTab('profile');
   setLog(`Сессия восстановлена: ${currentCharacter.name}`);
