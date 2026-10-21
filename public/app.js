@@ -1,5 +1,8 @@
 const api = (url, options = {}) => fetch(url, options).then((r) => r.json());
 
+const STORAGE_KEY = 'rpg_current_character';
+const STORAGE_ID_KEY = 'rpg_current_id';
+
 let currentId = null;
 let currentCharacter = null;
 let authMode = 'register';
@@ -37,6 +40,48 @@ const shopBtn = document.getElementById('shopBtn');
 
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('.tab-panel');
+
+function saveSessionState() {
+  if (currentId && currentCharacter) {
+    localStorage.setItem(STORAGE_ID_KEY, String(currentId));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCharacter));
+  } else {
+    localStorage.removeItem(STORAGE_ID_KEY);
+    localStorage.removeItem(STORAGE_KEY);
+  }
+}
+
+function clearSessionState() {
+  currentId = null;
+  currentCharacter = null;
+  localStorage.removeItem(STORAGE_ID_KEY);
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+function restoreSessionState() {
+  try {
+    const savedId = localStorage.getItem(STORAGE_ID_KEY);
+    const savedCharacter = localStorage.getItem(STORAGE_KEY);
+
+    if (!savedId || !savedCharacter) {
+      clearSessionState();
+      return false;
+    }
+
+    const parsed = JSON.parse(savedCharacter);
+    if (!parsed || !parsed.id) {
+      clearSessionState();
+      return false;
+    }
+
+    currentId = savedId;
+    currentCharacter = parsed;
+    return true;
+  } catch (err) {
+    clearSessionState();
+    return false;
+  }
+}
 
 function setLog(text) {
   logDiv.textContent = text;
@@ -82,6 +127,7 @@ function showAuthScreen() {
 function renderCharacter(c) {
   currentCharacter = c;
   currentId = c.id;
+  saveSessionState();
 
   statsDiv.innerHTML = `
     <strong>${c.name}</strong> (${c.classId})<br>
@@ -132,6 +178,7 @@ function renderCharacterList(list) {
       if (res.error) return alert(res.error);
       currentCharacter = res.character;
       currentId = res.character.id;
+      saveSessionState();
       startGameBtn.classList.remove('hidden');
       setAuthMode('register');
       setLog('Герой загружен. Нажмите «Начать игру».');
@@ -166,6 +213,7 @@ async function createCharacter() {
 
   currentCharacter = res.character;
   currentId = res.character.id;
+  saveSessionState();
   startGameBtn.classList.remove('hidden');
   setLog('Персонаж создан. Нажмите «Начать игру».');
   await loadCharacters();
@@ -187,6 +235,7 @@ async function loginCharacter() {
 
   currentCharacter = res.character;
   currentId = res.character.id;
+  saveSessionState();
   startGameBtn.classList.remove('hidden');
   setLog('Вход выполнен. Нажмите «Начать игру».');
 }
@@ -210,6 +259,7 @@ async function travel(to) {
   if (res.error) return alert(res.error);
 
   currentCharacter = res.character;
+  saveSessionState();
   renderCharacter(res.character);
   setLog(`Вы переместились в ${res.location.name}. ${res.location.description}`);
 }
@@ -228,6 +278,7 @@ async function fight() {
   if (res.log) setLog(res.log.join('\n'));
   if (res.character) {
     currentCharacter = res.character;
+    saveSessionState();
     renderCharacter(res.character);
   }
 
@@ -274,6 +325,7 @@ async function renderInventoryTab() {
       if (useRes.error) return alert(useRes.error);
       setLog(useRes.message || 'Предмет использован');
       currentCharacter = useRes.character;
+      saveSessionState();
       renderCharacter(useRes.character);
       renderInventoryTab();
     };
@@ -331,6 +383,7 @@ async function renderShopTab() {
     if (res.error) return alert(res.error);
     setLog(res.message || 'Покупка совершена.');
     currentCharacter = res.character;
+    saveSessionState();
     renderCharacter(res.character);
     renderShopTab();
     renderInventoryTab();
@@ -385,10 +438,25 @@ tabButtons.forEach((btn) => {
   };
 });
 
+async function restoreSession() {
+  const restored = restoreSessionState();
+
+  if (!restored) {
+    setLog('Добро пожаловать. Создайте героя или войдите по нику и паролю.');
+    showAuthScreen();
+    setAuthMode('register');
+    setActiveTab('profile');
+    startGameBtn.classList.add('hidden');
+    return;
+  }
+
+  currentCharacter = currentCharacter || { ...currentCharacter };
+  renderCharacter(currentCharacter);
+  setActiveTab('profile');
+  setLog(`Сессия восстановлена: ${currentCharacter.name}`);
+  startGameBtn.classList.add('hidden');
+}
+
 loadWorld();
 loadCharacters();
-setLog('Добро пожаловать. Создайте героя или войдите по нику и паролю.');
-showAuthScreen();
-setAuthMode('register');
-setActiveTab('profile');
-startGameBtn.classList.add('hidden');
+restoreSession();
