@@ -1,71 +1,10 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const sqlite3 = require('sqlite3').verbose();
 
-const DB_FILE = path.join(__dirname, 'db.json');
-
-function loadDB() {
-  if (!fs.existsSync(DB_FILE)) {
-    const initial = {
-      characters: {},
-      locations: [
-        {
-          id: 'town',
-          name: 'Город',
-          description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.',
-          monsters: []
-        },
-        {
-          id: 'forest',
-          name: 'Лес',
-          description: 'Темный лес. Здесь встречаются гоблины и волки.',
-          monsters: ['goblin', 'wolf']
-        },
-        {
-          id: 'cave',
-          name: 'Пещера',
-          description: 'Зловещая пещера, где прячутся бандиты и опасные существа.',
-          monsters: ['bandit', 'slime']
-        }
-      ],
-      monsters: {
-        goblin: { id: 'goblin', name: 'Гоблин', hp: 14, atk: 4, def: 1, xp: 10, gold: 7 },
-        wolf: { id: 'wolf', name: 'Волк', hp: 18, atk: 5, def: 1, xp: 15, gold: 10 },
-        bandit: { id: 'bandit', name: 'Бандит', hp: 24, atk: 7, def: 2, xp: 18, gold: 18 },
-        slime: { id: 'slime', name: 'Слизь', hp: 16, atk: 4, def: 1, xp: 12, gold: 9 }
-      }
-    };
-    fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2));
-  }
-
-  const raw = fs.readFileSync(DB_FILE, 'utf8');
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    const repaired = {
-      characters: {},
-      locations: [
-        { id: 'town', name: 'Город', description: 'Тихий город.', monsters: [] },
-        { id: 'forest', name: 'Лес', description: 'Темный лес.', monsters: ['goblin', 'wolf'] },
-        { id: 'cave', name: 'Пещера', description: 'Зловещая пещера.', monsters: ['bandit', 'slime'] }
-      ],
-      monsters: {
-        goblin: { id: 'goblin', name: 'Гоблин', hp: 14, atk: 4, def: 1, xp: 10, gold: 7 },
-        wolf: { id: 'wolf', name: 'Волк', hp: 18, atk: 5, def: 1, xp: 15, gold: 10 },
-        bandit: { id: 'bandit', name: 'Бандит', hp: 24, atk: 7, def: 2, xp: 18, gold: 18 },
-        slime: { id: 'slime', name: 'Слизь', hp: 16, atk: 4, def: 1, xp: 12, gold: 9 }
-      }
-    };
-    fs.writeFileSync(DB_FILE, JSON.stringify(repaired, null, 2));
-    return repaired;
-  }
-}
-
-function saveDB(db) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
-}
+const DB_FILE = path.join(__dirname, 'rpg.db');
 
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -139,79 +78,225 @@ function updateQuests(char) {
   }
 }
 
+function serializeCharacter(character) {
+  return {
+    name: character.name,
+    classId: character.classId,
+    level: character.level,
+    xp: character.xp,
+    xpToNext: character.xpToNext,
+    maxHp: character.maxHp,
+    hp: character.hp,
+    str: character.str,
+    agi: character.agi,
+    int: character.int,
+    gold: character.gold,
+    location: character.location,
+    kills: character.kills,
+    inventory: JSON.stringify(character.inventory || []),
+    quests: JSON.stringify(character.quests || []),
+    createdAt: character.createdAt || Date.now()
+  };
+}
+
+function deserializeCharacter(row) {
+  if (!row) return null;
+  return {
+    name: row.name,
+    classId: row.classId,
+    level: row.level,
+    xp: row.xp,
+    xpToNext: row.xpToNext,
+    maxHp: row.maxHp,
+    hp: row.hp,
+    str: row.str,
+    agi: row.agi,
+    int: row.int,
+    gold: row.gold,
+    location: row.location,
+    kills: row.kills,
+    inventory: JSON.parse(row.inventory || '[]'),
+    quests: JSON.parse(row.quests || JSON.stringify(createDefaultQuests())),
+    createdAt: row.createdAt
+  };
+}
+
+function openDatabase() {
+  const db = new sqlite3.Database(DB_FILE);
+  db.serialize(() => {
+    db.run(`
+      CREATE TABLE IF NOT EXISTS characters (
+        name TEXT PRIMARY KEY,
+        classId TEXT,
+        level INTEGER,
+        xp INTEGER,
+        xpToNext INTEGER,
+        maxHp INTEGER,
+        hp INTEGER,
+        str INTEGER,
+        agi INTEGER,
+        int INTEGER,
+        gold INTEGER,
+        location TEXT,
+        kills INTEGER,
+        inventory TEXT,
+        quests TEXT,
+        createdAt INTEGER
+      )
+    `);
+  });
+  return db;
+}
+
+const db = openDatabase();
+
+function dbRun(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) return reject(err);
+      resolve({ lastID: this.lastID, changes: this.changes });
+    });
+  });
+}
+
+function dbGet(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) return reject(err);
+      resolve(row);
+    });
+  });
+}
+
+async function saveCharacter(character) {
+  const row = serializeCharacter(character);
+  await dbRun(
+    `INSERT OR REPLACE INTO characters (
+      name, classId, level, xp, xpToNext, maxHp, hp, str, agi, int, gold, location, kills, inventory, quests, createdAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.name,
+      row.classId,
+      row.level,
+      row.xp,
+      row.xpToNext,
+      row.maxHp,
+      row.hp,
+      row.str,
+      row.agi,
+      row.int,
+      row.gold,
+      row.location,
+      row.kills,
+      row.inventory,
+      row.quests,
+      row.createdAt
+    ]
+  );
+}
+
+async function loadCharacter(name) {
+  const row = await dbGet('SELECT * FROM characters WHERE name = ?', [name]);
+  return deserializeCharacter(row);
+}
+
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/world', (req, res) => {
-  const db = loadDB();
   res.json({
-    locations: db.locations,
-    monsters: db.monsters
+    locations: [
+      { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
+      { id: 'forest', name: 'Лес', description: 'Темный лес. Здесь встречаются гоблины и волки.', monsters: ['goblin', 'wolf'] },
+      { id: 'cave', name: 'Пещера', description: 'Зловещая пещера, где прячутся бандиты и опасные существа.', monsters: ['bandit', 'slime'] }
+    ],
+    monsters: {
+      goblin: { id: 'goblin', name: 'Гоблин', hp: 14, atk: 4, def: 1, xp: 10, gold: 7 },
+      wolf: { id: 'wolf', name: 'Волк', hp: 18, atk: 5, def: 1, xp: 15, gold: 10 },
+      bandit: { id: 'bandit', name: 'Бандит', hp: 24, atk: 7, def: 2, xp: 18, gold: 18 },
+      slime: { id: 'slime', name: 'Слизь', hp: 16, atk: 4, def: 1, xp: 12, gold: 9 }
+    }
   });
 });
 
 app.get('/api/locations', (req, res) => {
-  const db = loadDB();
-  res.json(db.locations);
+  res.json([
+    { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
+    { id: 'forest', name: 'Лес', description: 'Темный лес. Здесь встречаются гоблины и волки.', monsters: ['goblin', 'wolf'] },
+    { id: 'cave', name: 'Пещера', description: 'Зловещая пещера, где прячутся бандиты и опасные существа.', monsters: ['bandit', 'slime'] }
+  ]);
 });
 
-app.post('/api/createCharacter', (req, res) => {
+app.post('/api/createCharacter', async (req, res) => {
   const { name, classId } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Нужно имя персонажа.' });
 
-  const db = loadDB();
   const cleanName = name.trim();
-  if (db.characters[cleanName]) return res.status(400).json({ error: 'Персонаж с таким именем уже существует.' });
+  const existing = await loadCharacter(cleanName);
+  if (existing) return res.status(400).json({ error: 'Персонаж с таким именем уже существует.' });
 
   const classMap = ['warrior', 'rogue', 'mage'];
   const finalClass = classMap.includes(classId) ? classId : 'warrior';
 
-  const char = buildCharacter(cleanName, finalClass);
-  db.characters[cleanName] = char;
-  saveDB(db);
-  res.json({ character: char });
+  const character = buildCharacter(cleanName, finalClass);
+  await saveCharacter(character);
+  res.json({ character });
 });
 
-app.get('/api/character', (req, res) => {
+app.get('/api/character', async (req, res) => {
   const name = req.query.name;
   if (!name) return res.status(400).json({ error: 'Нужно имя персонажа.' });
 
-  const db = loadDB();
-  const char = db.characters[name];
+  const char = await loadCharacter(name);
   if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+
   updateQuests(char);
+  await saveCharacter(char);
   res.json({ character: char });
 });
 
-app.post('/api/travel', (req, res) => {
+app.post('/api/travel', async (req, res) => {
   const { name, to } = req.body;
-  const db = loadDB();
-  const char = db.characters[name];
-  const loc = db.locations.find((l) => l.id === to);
+  const char = await loadCharacter(name);
+  const loc = [
+    { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
+    { id: 'forest', name: 'Лес', description: 'Темный лес. Здесь встречаются гоблины и волки.', monsters: ['goblin', 'wolf'] },
+    { id: 'cave', name: 'Пещера', description: 'Зловещая пещера, где прячутся бандиты и опасные существа.', monsters: ['bandit', 'slime'] }
+  ].find((l) => l.id === to);
 
   if (!char || !loc) return res.status(400).json({ error: 'Неверные данные для перемещения.' });
 
   char.location = to;
-  saveDB(db);
+  await saveCharacter(char);
   res.json({ location: loc, character: char });
 });
 
-app.post('/api/fight', (req, res) => {
+app.post('/api/fight', async (req, res) => {
   const { name } = req.body;
-  const db = loadDB();
-  const char = db.characters[name];
-
+  const char = await loadCharacter(name);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
 
-  const loc = db.locations.find((l) => l.id === char.location);
+  const loc = [
+    { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
+    { id: 'forest', name: 'Лес', description: 'Темный лес. Здесь встречаются гоблины и волки.', monsters: ['goblin', 'wolf'] },
+    { id: 'cave', name: 'Пещера', description: 'Зловещая пещера, где прячутся бандиты и опасные существа.', monsters: ['bandit', 'slime'] }
+  ].find((l) => l.id === char.location);
+
   if (!loc || !loc.monsters || loc.monsters.length === 0) {
     return res.json({ message: 'Здесь нет врагов.', character: char });
   }
 
+  const monsters = {
+    goblin: { id: 'goblin', name: 'Гоблин', hp: 14, atk: 4, def: 1, xp: 10, gold: 7 },
+    wolf: { id: 'wolf', name: 'Волк', hp: 18, atk: 5, def: 1, xp: 15, gold: 10 },
+    bandit: { id: 'bandit', name: 'Бандит', hp: 24, atk: 7, def: 2, xp: 18, gold: 18 },
+    slime: { id: 'slime', name: 'Слизь', hp: 16, atk: 4, def: 1, xp: 12, gold: 9 }
+  };
+
   const monsterId = loc.monsters[randInt(0, loc.monsters.length - 1)];
-  const template = db.monsters[monsterId];
+  const template = monsters[monsterId];
   const monster = { ...template };
   const log = [];
 
@@ -266,8 +351,7 @@ app.post('/api/fight', (req, res) => {
       log.push(`Все квесты выполнены! Получено ${bonusGold} золота в награду.`);
     }
 
-    db.characters[name] = char;
-    saveDB(db);
+    await saveCharacter(char);
     return res.json({ victory: true, log, character: char });
   }
 
@@ -276,25 +360,20 @@ app.post('/api/fight', (req, res) => {
   char.location = 'town';
   log.push(`${char.name} был(а) побежден(а), отступил(а) в город и потерял(а) часть золота.`);
 
-  db.characters[name] = char;
-  saveDB(db);
+  await saveCharacter(char);
   res.json({ victory: false, log, character: char });
 });
 
-app.get('/api/inventory', (req, res) => {
+app.get('/api/inventory', async (req, res) => {
   const name = req.query.name;
-  const db = loadDB();
-  const char = db.characters[name];
-
+  const char = await loadCharacter(name);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
   res.json({ inventory: char.inventory });
 });
 
-app.post('/api/useItem', (req, res) => {
+app.post('/api/useItem', async (req, res) => {
   const { name, idx } = req.body;
-  const db = loadDB();
-  const char = db.characters[name];
-
+  const char = await loadCharacter(name);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
 
   const item = char.inventory[idx];
@@ -305,28 +384,26 @@ app.post('/api/useItem', (req, res) => {
     char.hp = Math.min(char.maxHp, char.hp + healed);
     item.qty -= 1;
     if (item.qty <= 0) char.inventory.splice(idx, 1);
-    saveDB(db);
+    await saveCharacter(char);
     return res.json({ message: `Использован ${item.name}. Восстановлено ${healed} HP.`, character: char });
   }
 
-  res.status(400).json({ error: 'Этот предмет нельзя использовать.' });
+  return res.status(400).json({ error: 'Этот предмет нельзя использовать.' });
 });
 
-app.get('/api/quests', (req, res) => {
+app.get('/api/quests', async (req, res) => {
   const name = req.query.name;
-  const db = loadDB();
-  const char = db.characters[name];
-
+  const char = await loadCharacter(name);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
+
   updateQuests(char);
+  await saveCharacter(char);
   res.json({ quests: char.quests });
 });
 
-app.post('/api/buyPotion', (req, res) => {
+app.post('/api/buyPotion', async (req, res) => {
   const { name } = req.body;
-  const db = loadDB();
-  const char = db.characters[name];
-
+  const char = await loadCharacter(name);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
   if (char.gold < 10) return res.status(400).json({ error: 'Недостаточно золота.' });
 
@@ -335,7 +412,7 @@ app.post('/api/buyPotion', (req, res) => {
   if (existing) existing.qty += 1;
   else char.inventory.push({ id: 'potion', name: 'Зелье лечения', qty: 1, heal: 15 });
 
-  saveDB(db);
+  await saveCharacter(char);
   res.json({ message: 'Куплено зелье лечения.', character: char });
 });
 
