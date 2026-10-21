@@ -1,0 +1,60 @@
+const STORAGE_KEY = 'rpg_current_character';
+const STORAGE_ID_KEY = 'rpg_current_id';
+
+function clearSessionState() {
+  localStorage.removeItem(STORAGE_ID_KEY);
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+function restoreSessionState() {
+  try {
+    const savedId = localStorage.getItem(STORAGE_ID_KEY);
+    const savedCharacter = localStorage.getItem(STORAGE_KEY);
+
+    if (!savedId || !savedCharacter) return null;
+
+    const parsed = JSON.parse(savedCharacter);
+    if (!parsed || !parsed.id) return null;
+
+    return { id: savedId, ...parsed };
+  } catch (error) {
+    clearSessionState();
+    return null;
+  }
+}
+
+function renderCharacterPage() {
+  const character = restoreSessionState();
+  const title = document.getElementById('title');
+  const characterCard = document.getElementById('characterCard');
+
+  if (!character) {
+    clearSessionState();
+    window.location.href = '/';
+    return;
+  }
+
+  title.textContent = character.name;
+  characterCard.innerHTML = `
+    <p><strong>Класс:</strong> ${character.classId}</p>
+    <p><strong>Уровень:</strong> ${character.level}</p>
+    <p><strong>HP:</strong> ${character.hp}/${character.maxHp}</p>
+    <p><strong>Сила:</strong> ${character.str}</p>
+    <p><strong>Ловкость:</strong> ${character.agi}</p>
+    <p><strong>Интеллект:</strong> ${character.int}</p>
+    <p><strong>Опыт:</strong> ${character.xp}/${character.xpToNext}</p>
+    <p><strong>Золото:</strong> ${character.gold}</p>
+    <p><strong>Локация:</strong> ${character.location}</p>
+  `;
+
+  document.getElementById('playBtn').onclick = () => {
+    window.location.href = '/';
+  };
+
+  document.getElementById('logoutBtn').onclick = () => {
+    clearSessionState();
+    window.location.href = '/';
+  };
+}
+
+renderCharacterPage();
