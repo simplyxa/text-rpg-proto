@@ -1,38 +1,56 @@
 <!doctype html>
-<html>
+<html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <title>Text RPG Prototype</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RPG World</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <div id="app">
-    <h1>Text RPG (прототип)</h1>
+    <header class="topbar">
+      <div>
+        <h1>RPG World</h1>
+      </div>
+      <div class="topbar-actions">
+        <button id="createBtn">Создать героя</button>
+        <button id="loadBtn">Загрузить</button>
+      </div>
+    </header>
 
-    <div id="create">
-      <input id="name" placeholder="Имя персонажа" />
+    <section class="panel create-panel">
+      <input id="name" placeholder="Имя героя" />
       <select id="class">
         <option value="warrior">Воин</option>
         <option value="rogue">Разбойник</option>
         <option value="mage">Маг</option>
       </select>
-      <button id="createBtn">Создать</button>
-      <button id="loadBtn">Загрузить</button>
-    </div>
+    </section>
 
-    <div id="game" style="display:none;">
-      <div id="stats"></div>
-      <div id="controls">
-        <button id="travelTown">В город</button>
-        <button id="travelForest">В лес</button>
-        <button id="travelCave">В пещеру</button>
-        <button id="fightBtn">Атаковать</button>
-        <button id="invBtn">Инвентарь</button>
-      </div>
-      <div id="log"></div>
-    </div>
+    <section id="game" class="game hidden">
+      <aside class="sidebar panel">
+        <h2>Персонаж</h2>
+        <div id="stats"></div>
 
+        <h3>Локации</h3>
+        <div id="locations" class="button-group"></div>
+
+        <h3>Действия</h3>
+        <div class="button-group">
+          <button id="fightBtn">Атаковать</button>
+          <button id="invBtn">Инвентарь</button>
+          <button id="questBtn">Квесты</button>
+          <button id="shopBtn">Магазин</button>
+        </div>
+      </aside>
+
+      <main class="main panel">
+        <div id="gameStatus" class="status-bar"></div>
+        <div id="log" class="log"></div>
+      </main>
+    </section>
   </div>
+
   <script src="/app.js"></script>
 </body>
 </html>
