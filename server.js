@@ -10,6 +10,10 @@ function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function uid() {
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
 function createDefaultQuests() {
   return [
     {
@@ -35,13 +39,14 @@ function createDefaultQuests() {
   ];
 }
 
-function buildCharacter(name, classId) {
+function buildCharacter(name, classId, id = uid()) {
   const base = { hp: 30, str: 5, agi: 4, int: 3 };
   if (classId === 'warrior') base.str += 2;
   if (classId === 'rogue') base.agi += 2;
   if (classId === 'mage') base.int += 2;
 
   return {
+    id,
     name,
     classId: classId || 'warrior',
     level: 1,
@@ -80,6 +85,7 @@ function updateQuests(char) {
 
 function serializeCharacter(character) {
   return {
+    id: character.id,
     name: character.name,
     classId: character.classId,
     level: character.level,
@@ -102,6 +108,7 @@ function serializeCharacter(character) {
 function deserializeCharacter(row) {
   if (!row) return null;
   return {
+    id: row.id,
     name: row.name,
     classId: row.classId,
     level: row.level,
@@ -126,7 +133,8 @@ function openDatabase() {
   db.serialize(() => {
     db.run(`
       CREATE TABLE IF NOT EXISTS characters (
-        name TEXT PRIMARY KEY,
+        id TEXT PRIMARY KEY,
+        name TEXT,
         classId TEXT,
         level INTEGER,
         xp INTEGER,
@@ -168,13 +176,23 @@ function dbGet(sql, params = []) {
   });
 }
 
+function dbAll(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) return reject(err);
+      resolve(rows);
+    });
+  });
+}
+
 async function saveCharacter(character) {
   const row = serializeCharacter(character);
   await dbRun(
     `INSERT OR REPLACE INTO characters (
-      name, classId, level, xp, xpToNext, maxHp, hp, str, agi, int, gold, location, kills, inventory, quests, createdAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, name, classId, level, xp, xpToNext, maxHp, hp, str, agi, int, gold, location, kills, inventory, quests, createdAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
+      row.id,
       row.name,
       row.classId,
       row.level,
@@ -195,8 +213,13 @@ async function saveCharacter(character) {
   );
 }
 
-async function loadCharacter(name) {
-  const row = await dbGet('SELECT * FROM characters WHERE name = ?', [name]);
+async function listCharacters() {
+  const rows = await dbAll('SELECT * FROM characters ORDER BY createdAt DESC');
+  return rows.map(deserializeCharacter);
+}
+
+async function loadCharacterById(id) {
+  const row = await dbGet('SELECT * FROM characters WHERE id = ?', [id]);
   return deserializeCharacter(row);
 }
 
@@ -204,6 +227,11 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/api/characters', async (req, res) => {
+  const characters = await listCharacters();
+  res.json({ characters });
+});
 
 app.get('/api/world', (req, res) => {
   res.json({
@@ -234,9 +262,6 @@ app.post('/api/createCharacter', async (req, res) => {
   if (!name || !name.trim()) return res.status(400).json({ error: 'Нужно имя персонажа.' });
 
   const cleanName = name.trim();
-  const existing = await loadCharacter(cleanName);
-  if (existing) return res.status(400).json({ error: 'Персонаж с таким именем уже существует.' });
-
   const classMap = ['warrior', 'rogue', 'mage'];
   const finalClass = classMap.includes(classId) ? classId : 'warrior';
 
@@ -246,10 +271,10 @@ app.post('/api/createCharacter', async (req, res) => {
 });
 
 app.get('/api/character', async (req, res) => {
-  const name = req.query.name;
-  if (!name) return res.status(400).json({ error: 'Нужно имя персонажа.' });
+  const { id } = req.query;
+  if (!id) return res.status(400).json({ error: 'Нужно id персонажа.' });
 
-  const char = await loadCharacter(name);
+  const char = await loadCharacterById(id);
   if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
 
   updateQuests(char);
@@ -258,13 +283,14 @@ app.get('/api/character', async (req, res) => {
 });
 
 app.post('/api/travel', async (req, res) => {
-  const { name, to } = req.body;
-  const char = await loadCharacter(name);
-  const loc = [
+  const { id, to } = req.body;
+  const char = await loadCharacterById(id);
+  const locs = [
     { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
     { id: 'forest', name: 'Лес', description: 'Темный лес. Здесь встречаются гоблины и волки.', monsters: ['goblin', 'wolf'] },
     { id: 'cave', name: 'Пещера', description: 'Зловещая пещера, где прячутся бандиты и опасные существа.', monsters: ['bandit', 'slime'] }
-  ].find((l) => l.id === to);
+  ];
+  const loc = locs.find((l) => l.id === to);
 
   if (!char || !loc) return res.status(400).json({ error: 'Неверные данные для перемещения.' });
 
@@ -274,15 +300,16 @@ app.post('/api/travel', async (req, res) => {
 });
 
 app.post('/api/fight', async (req, res) => {
-  const { name } = req.body;
-  const char = await loadCharacter(name);
+  const { id } = req.body;
+  const char = await loadCharacterById(id);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
 
-  const loc = [
+  const locs = [
     { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
     { id: 'forest', name: 'Лес', description: 'Темный лес. Здесь встречаются гоблины и волки.', monsters: ['goblin', 'wolf'] },
     { id: 'cave', name: 'Пещера', description: 'Зловещая пещера, где прячутся бандиты и опасные существа.', monsters: ['bandit', 'slime'] }
-  ].find((l) => l.id === char.location);
+  ];
+  const loc = locs.find((l) => l.id === char.location);
 
   if (!loc || !loc.monsters || loc.monsters.length === 0) {
     return res.json({ message: 'Здесь нет врагов.', character: char });
@@ -296,8 +323,7 @@ app.post('/api/fight', async (req, res) => {
   };
 
   const monsterId = loc.monsters[randInt(0, loc.monsters.length - 1)];
-  const template = monsters[monsterId];
-  const monster = { ...template };
+  const monster = { ...monsters[monsterId] };
   const log = [];
 
   while (char.hp > 0 && monster.hp > 0) {
@@ -365,15 +391,15 @@ app.post('/api/fight', async (req, res) => {
 });
 
 app.get('/api/inventory', async (req, res) => {
-  const name = req.query.name;
-  const char = await loadCharacter(name);
+  const id = req.query.id;
+  const char = await loadCharacterById(id);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
   res.json({ inventory: char.inventory });
 });
 
 app.post('/api/useItem', async (req, res) => {
-  const { name, idx } = req.body;
-  const char = await loadCharacter(name);
+  const { id, idx } = req.body;
+  const char = await loadCharacterById(id);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
 
   const item = char.inventory[idx];
@@ -392,8 +418,8 @@ app.post('/api/useItem', async (req, res) => {
 });
 
 app.get('/api/quests', async (req, res) => {
-  const name = req.query.name;
-  const char = await loadCharacter(name);
+  const id = req.query.id;
+  const char = await loadCharacterById(id);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
 
   updateQuests(char);
@@ -402,8 +428,8 @@ app.get('/api/quests', async (req, res) => {
 });
 
 app.post('/api/buyPotion', async (req, res) => {
-  const { name } = req.body;
-  const char = await loadCharacter(name);
+  const { id } = req.body;
+  const char = await loadCharacterById(id);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
   if (char.gold < 10) return res.status(400).json({ error: 'Недостаточно золота.' });
 
