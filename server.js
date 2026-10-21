@@ -173,6 +173,30 @@ async function initDatabase() {
       createdAt BIGINT
     )
   `);
+
+  const columns = await pool.query(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = 'characters'
+  `);
+
+  const present = new Set(columns.rows.map((r) => r.column_name));
+  const needed = [
+    'id', 'name', 'classId', 'level', 'xp', 'xpToNext', 'maxHp', 'hp',
+    'str', 'agi', 'int', 'gold', 'location', 'kills', 'inventory',
+    'quests', 'passwordHash', 'createdAt'
+  ];
+
+  for (const col of needed) {
+    if (!present.has(col)) {
+      const sql = `ALTER TABLE characters ADD COLUMN ${col} TEXT`;
+      if (col === 'level' || col === 'xp' || col === 'xpToNext' || col === 'maxHp' || col === 'hp' || col === 'str' || col === 'agi' || col === 'int' || col === 'gold' || col === 'kills' || col === 'createdAt') {
+        await pool.query(`ALTER TABLE characters ADD COLUMN ${col} INTEGER`);
+      } else if (col === 'id' || col === 'name' || col === 'classId' || col === 'location' || col === 'inventory' || col === 'quests' || col === 'passwordHash') {
+        await pool.query(`ALTER TABLE characters ADD COLUMN ${col} TEXT`);
+      }
+    }
+  }
 }
 
 async function saveCharacter(character) {
