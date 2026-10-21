@@ -83,8 +83,8 @@ function restoreSessionState() {
   }
 }
 
-function goToCharacterPage() {
-  window.location.href = '/character.html';
+function goToCityPage() {
+  window.location.href = '/city.html';
 }
 
 function setLog(text) {
@@ -183,7 +183,7 @@ function renderCharacterList(list) {
       currentCharacter = res.character;
       currentId = res.character.id;
       saveSessionState();
-      goToCharacterPage();
+      goToCityPage();
     };
 
     characterListDiv.appendChild(item);
@@ -216,7 +216,7 @@ async function createCharacter() {
   currentCharacter = res.character;
   currentId = res.character.id;
   saveSessionState();
-  goToCharacterPage();
+  goToCityPage();
 }
 
 async function loginCharacter() {
@@ -236,7 +236,7 @@ async function loginCharacter() {
   currentCharacter = res.character;
   currentId = res.character.id;
   saveSessionState();
-  goToCharacterPage();
+  goToCityPage();
 }
 
 async function startSelectedGame() {
@@ -453,6 +453,14 @@ async function restoreSession() {
   setActiveTab('profile');
   setLog(`Сессия восстановлена: ${currentCharacter.name}`);
   startGameBtn.classList.add('hidden');
+}
+
+const page = window.location.pathname;
+if (page === '/city.html') {
+  const hero = restoreSessionState();
+  if (!hero) {
+    window.location.href = '/';
+  }
 }
 
 loadWorld();
