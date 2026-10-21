@@ -13,11 +13,21 @@
         <div class="auth-header">
           <span class="eyebrow">Добро пожаловать в</span>
           <h1>RPG World</h1>
+          <p class="subtitle">Создайте героя или войдите в мир магии.</p>
         </div>
 
-        <div class="auth-columns">
-          <div class="auth-panel">
-            <h3>Новый персонаж</h3>
+        <div class="auth-mode-switch" aria-label="Режим входа">
+          <button class="mode-btn active" data-auth-mode="register" type="button">Создать героя</button>
+          <button class="mode-btn" data-auth-mode="login" type="button">Войти</button>
+        </div>
+
+        <div class="auth-panels">
+          <div id="registerPanel" class="auth-panel active">
+            <div class="auth-panel-header">
+              <h3>Новый персонаж</h3>
+              <span class="chip">Новый путь</span>
+            </div>
+
             <div class="auth-form">
               <label>
                 <span>Ник</span>
@@ -38,14 +48,18 @@
                 <input id="newPassword" type="password" placeholder="Минимум 4 символа" maxlength="32" />
               </label>
 
-              <button id="createBtn" class="primary-btn">Создать персонажа</button>
-              <small class="helper-text">Советуем завести пароль к 10 уровню.</small>
-              <button id="startGameBtn" class="secondary-btn hidden">Начать игру</button>
+              <button id="createBtn" class="primary-btn" type="button">Создать персонажа</button>
+              <button id="startGameBtn" class="secondary-btn hidden" type="button">Начать игру</button>
+              <small class="helper-text">Советуем придумать пароль заранее и не хранить его в открытом виде.</small>
             </div>
           </div>
 
-          <div class="auth-panel">
-            <h3>Вход для героя</h3>
+          <div id="loginPanel" class="auth-panel">
+            <div class="auth-panel-header">
+              <h3>Вход для героя</h3>
+              <span class="chip neutral">Старый герой</span>
+            </div>
+
             <div class="auth-form login-form">
               <label>
                 <span>Ник</span>
@@ -57,7 +71,7 @@
                 <input id="loginPassword" type="password" placeholder="Пароль" maxlength="32" />
               </label>
 
-              <button id="loginBtn" class="primary-btn">Войти</button>
+              <button id="loginBtn" class="primary-btn" type="button">Войти</button>
             </div>
           </div>
         </div>
@@ -81,10 +95,10 @@
 
         <h3>Действия</h3>
         <div class="button-group">
-          <button id="fightBtn">Атаковать</button>
-          <button id="invBtn">Инвентарь</button>
-          <button id="questBtn">Квесты</button>
-          <button id="shopBtn">Магазин</button>
+          <button id="fightBtn" type="button">Атаковать</button>
+          <button id="invBtn" type="button">Инвентарь</button>
+          <button id="questBtn" type="button">Квесты</button>
+          <button id="shopBtn" type="button">Магазин</button>
         </div>
       </aside>
 
@@ -92,10 +106,10 @@
         <div id="gameStatus" class="status-bar"></div>
 
         <div class="tabs">
-          <button class="tab-button active" data-tab="profile">Персонаж</button>
-          <button class="tab-button" data-tab="inventory">Инвентарь</button>
-          <button class="tab-button" data-tab="quests">Квесты</button>
-          <button class="tab-button" data-tab="shop">Магазин</button>
+          <button class="tab-button active" data-tab="profile" type="button">Персонаж</button>
+          <button class="tab-button" data-tab="inventory" type="button">Инвентарь</button>
+          <button class="tab-button" data-tab="quests" type="button">Квесты</button>
+          <button class="tab-button" data-tab="shop" type="button">Магазин</button>
         </div>
 
         <div class="tab-panel active" id="profile-panel">

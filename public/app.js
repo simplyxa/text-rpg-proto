@@ -2,9 +2,12 @@ const api = (url, options = {}) => fetch(url, options).then((r) => r.json());
 
 let currentId = null;
 let currentCharacter = null;
+let authMode = 'register';
 
 const authScreen = document.getElementById('authScreen');
 const gameDiv = document.getElementById('game');
+const modeButtons = document.querySelectorAll('.mode-btn');
+const authPanels = document.querySelectorAll('.auth-panel');
 
 const newNicknameInput = document.getElementById('newNickname');
 const newClassInput = document.getElementById('newClass');
@@ -50,6 +53,19 @@ function setActiveTab(name) {
 
   tabPanels.forEach((panel) => {
     panel.classList.toggle('active', panel.id === `${name}-panel`);
+  });
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+
+  modeButtons.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.authMode === mode);
+  });
+
+  authPanels.forEach((panel) => {
+    const shouldShow = panel.id === `${mode}Panel`;
+    panel.classList.toggle('active', shouldShow);
   });
 }
 
@@ -117,7 +133,7 @@ function renderCharacterList(list) {
       currentCharacter = res.character;
       currentId = res.character.id;
       startGameBtn.classList.remove('hidden');
-      setActiveTab('profile');
+      setAuthMode('register');
       setLog('Герой загружен. Нажмите «Начать игру».');
     };
 
@@ -337,6 +353,10 @@ async function loadWorld() {
   }
 }
 
+modeButtons.forEach((btn) => {
+  btn.onclick = () => setAuthMode(btn.dataset.authMode);
+});
+
 createBtn.onclick = createCharacter;
 loginBtn.onclick = loginCharacter;
 startGameBtn.onclick = startSelectedGame;
@@ -369,5 +389,6 @@ loadWorld();
 loadCharacters();
 setLog('Добро пожаловать. Создайте героя или войдите по нику и паролю.');
 showAuthScreen();
+setAuthMode('register');
 setActiveTab('profile');
 startGameBtn.classList.add('hidden');
