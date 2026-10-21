@@ -14,10 +14,18 @@ const gameStatus = document.getElementById('gameStatus');
 const locationsDiv = document.getElementById('locations');
 const characterListDiv = document.getElementById('characterList');
 
+const profileContent = document.getElementById('profileContent');
+const inventoryContent = document.getElementById('inventoryContent');
+const questsContent = document.getElementById('questsContent');
+const shopContent = document.getElementById('shopContent');
+
 const fightBtn = document.getElementById('fightBtn');
 const invBtn = document.getElementById('invBtn');
 const questBtn = document.getElementById('questBtn');
 const shopBtn = document.getElementById('shopBtn');
+
+const tabButtons = document.querySelectorAll('.tab-button');
+const tabPanels = document.querySelectorAll('.tab-panel');
 
 function setLog(text) {
   logDiv.textContent = text;
@@ -25,6 +33,15 @@ function setLog(text) {
 
 function appendLog(text) {
   logDiv.textContent = (logDiv.textContent ? logDiv.textContent + '\n\n' : '') + text;
+}
+
+function setActiveTab(name) {
+  tabButtons.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.tab === name);
+  });
+  tabPanels.forEach((panel) => {
+    panel.classList.toggle('active', panel.id === `${name}-panel`);
+  });
 }
 
 function renderCharacter(c) {
@@ -39,6 +56,20 @@ function renderCharacter(c) {
     Опыт: ${c.xp}/${c.xpToNext}<br>
     Золото: ${c.gold}<br>
     Локация: ${c.location}
+  `;
+
+  profileContent.innerHTML = `
+    <h3>Профиль героя</h3>
+    <p><strong>Имя:</strong> ${c.name}</p>
+    <p><strong>Класс:</strong> ${c.classId}</p>
+    <p><strong>Уровень:</strong> ${c.level}</p>
+    <p><strong>HP:</strong> ${c.hp}/${c.maxHp}</p>
+    <p><strong>Сила:</strong> ${c.str}</p>
+    <p><strong>Ловкость:</strong> ${c.agi}</p>
+    <p><strong>Интеллект:</strong> ${c.int}</p>
+    <p><strong>Опыт:</strong> ${c.xp}/${c.xpToNext}</p>
+    <p><strong>Золото:</strong> ${c.gold}</p>
+    <p><strong>Локация:</strong> ${c.location}</p>
   `;
 
   gameStatus.textContent = `Игрок: ${c.name} • ${c.location} • Уровень ${c.level}`;
@@ -61,6 +92,7 @@ function renderCharacterList(list) {
       const res = await api(`/api/character?id=${encodeURIComponent(char.id)}`);
       if (res.error) return alert(res.error);
       renderCharacter(res.character);
+      setActiveTab('profile');
       setLog('Герой загружен.');
     };
     characterListDiv.appendChild(item);
@@ -90,6 +122,7 @@ async function createCharacter() {
 
   currentId = res.character.id;
   renderCharacter(res.character);
+  setActiveTab('profile');
   setLog('Персонаж создан. Добро пожаловать в мир.');
   await loadCharacters();
 }
@@ -130,68 +163,108 @@ async function fight() {
   }
 }
 
-async function showInventory() {
-  if (!currentId) return alert('Сначала выберите героя');
+async function renderInventoryTab() {
+  if (!currentId) {
+    inventoryContent.innerHTML = '<p>Сначала выберите героя.</p>';
+    return;
+  }
 
   const res = await api(`/api/inventory?id=${encodeURIComponent(currentId)}`);
-  if (res.error) return alert(res.error);
+  if (res.error) {
+    inventoryContent.innerHTML = `<p>${res.error}</p>`;
+    return;
+  }
 
   if (!res.inventory || res.inventory.length === 0) {
-    setLog('Инвентарь пуст.');
+    inventoryContent.innerHTML = '<p>Инвентарь пуст.</p>';
     return;
   }
 
-  const list = res.inventory.map((item, idx) => `${idx}: ${item.name} x${item.qty || 1}`).join('\n');
-  const selected = prompt(`Инвентарь:\n${list}\n\nВведите номер предмета для использования:`);
-  if (selected === null) return;
+  inventoryContent.innerHTML = res.inventory.map((item, idx) => `
+    <div class="item-row">
+      <div class="item-name">${item.name} x${item.qty}</div>
+      <button class="small-btn" data-use-index="${idx}">Использовать</button>
+    </div>
+  `).join('');
 
-  const idx = Number(selected);
-  if (Number.isNaN(idx) || idx < 0 || idx >= res.inventory.length) {
-    alert('Неверный индекс');
-    return;
-  }
+  inventoryContent.querySelectorAll('[data-use-index]').forEach((btn) => {
+    btn.onclick = async () => {
+      const idx = Number(btn.dataset.useIndex);
+      const useRes = await api('/api/useItem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentId, idx })
+      });
 
-  const useRes = await api('/api/useItem', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: currentId, idx })
+      if (useRes.error) return alert(useRes.error);
+      setLog(useRes.message || 'Предмет использован');
+      renderCharacter(useRes.character);
+      renderInventoryTab();
+    };
   });
-
-  if (useRes.error) return alert(useRes.error);
-
-  setLog(useRes.message || 'Предмет использован');
-  renderCharacter(useRes.character);
 }
 
-async function showQuests() {
-  if (!currentId) return alert('Сначала выберите героя');
+async function renderQuestsTab() {
+  if (!currentId) {
+    questsContent.innerHTML = '<p>Сначала выберите героя.</p>';
+    return;
+  }
 
   const res = await api(`/api/quests?id=${encodeURIComponent(currentId)}`);
-  if (res.error) return alert(res.error);
+  if (res.error) {
+    questsContent.innerHTML = `<p>${res.error}</p>`;
+    return;
+  }
 
-  const questText = res.quests.map((q, idx) =>
-    `${idx + 1}. ${q.title} — ${q.progress}/${q.target} ${q.done ? '(выполнено)' : '(в процессе)'}`
-  ).join('\n');
+  if (!res.quests || res.quests.length === 0) {
+    questsContent.innerHTML = '<p>Квестов нет.</p>';
+    return;
+  }
 
-  setLog(questText || 'Квестов нет.');
+  questsContent.innerHTML = res.quests.map((q) => `
+    <div class="quest-row">
+      <div class="quest-name">
+        <strong>${q.title}</strong><br>
+        ${q.description}<br>
+        ${q.progress}/${q.target} • ${q.done ? 'Выполнено' : 'В процессе'}
+      </div>
+    </div>
+  `).join('');
 }
 
-async function showShop() {
-  if (!currentId) return alert('Сначала выберите героя');
+async function renderShopTab() {
+  if (!currentId) {
+    shopContent.innerHTML = '<p>Сначала выберите героя.</p>';
+    return;
+  }
 
-  const confirmBuy = confirm('Магазин:\n- Зелье лечения: 10 золота\n\nКупить зелье?');
-  if (!confirmBuy) return;
+  shopContent.innerHTML = `
+    <div class="shop-row">
+      <div class="shop-name"><strong>Зелье лечения</strong><br>Восстанавливает 15 HP</div>
+      <button class="small-btn" id="buyPotionBtn">Купить за 10 золота</button>
+    </div>
+  `;
 
-  const res = await api('/api/buyPotion', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: currentId })
-  });
+  document.getElementById('buyPotionBtn').onclick = async () => {
+    const res = await api('/api/buyPotion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: currentId })
+    });
 
-  if (res.error) return alert(res.error);
+    if (res.error) return alert(res.error);
+    setLog(res.message || 'Покупка совершена.');
+    renderCharacter(res.character);
+    renderShopTab();
+    renderInventoryTab();
+  };
+}
 
-  setLog(res.message || 'Покупка совершена.');
-  renderCharacter(res.character);
+async function refreshTabs() {
+  if (!currentId) return;
+  await renderInventoryTab();
+  await renderQuestsTab();
+  await renderShopTab();
 }
 
 async function loadWorld() {
@@ -212,10 +285,30 @@ async function loadWorld() {
 
 createBtn.onclick = createCharacter;
 fightBtn.onclick = fight;
-invBtn.onclick = showInventory;
-questBtn.onclick = showQuests;
-shopBtn.onclick = showShop;
+invBtn.onclick = async () => {
+  setActiveTab('inventory');
+  await renderInventoryTab();
+};
+questBtn.onclick = async () => {
+  setActiveTab('quests');
+  await renderQuestsTab();
+};
+shopBtn.onclick = async () => {
+  setActiveTab('shop');
+  await renderShopTab();
+};
+
+tabButtons.forEach((btn) => {
+  btn.onclick = async () => {
+    const name = btn.dataset.tab;
+    setActiveTab(name);
+    if (name === 'inventory') await renderInventoryTab();
+    if (name === 'quests') await renderQuestsTab();
+    if (name === 'shop') await renderShopTab();
+  };
+});
 
 loadWorld();
 loadCharacters();
 setLog('Добро пожаловать. Создайте или выберите героя.');
+setActiveTab('profile');

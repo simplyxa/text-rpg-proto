@@ -34,7 +34,7 @@
     <section id="game" class="game hidden">
       <aside class="sidebar panel">
         <h2>Персонаж</h2>
-        <div id="stats"></div>
+        <div id="stats" class="stats-box"></div>
 
         <h3>Локации</h3>
         <div id="locations" class="button-group"></div>
@@ -50,6 +50,30 @@
 
       <main class="main panel">
         <div id="gameStatus" class="status-bar"></div>
+
+        <div class="tabs">
+          <button class="tab-button active" data-tab="profile">Персонаж</button>
+          <button class="tab-button" data-tab="inventory">Инвентарь</button>
+          <button class="tab-button" data-tab="quests">Квесты</button>
+          <button class="tab-button" data-tab="shop">Магазин</button>
+        </div>
+
+        <div class="tab-panel active" id="profile-panel">
+          <div id="profileContent" class="content-box"></div>
+        </div>
+
+        <div class="tab-panel" id="inventory-panel">
+          <div id="inventoryContent" class="content-box"></div>
+        </div>
+
+        <div class="tab-panel" id="quests-panel">
+          <div id="questsContent" class="content-box"></div>
+        </div>
+
+        <div class="tab-panel" id="shop-panel">
+          <div id="shopContent" class="content-box"></div>
+        </div>
+
         <div id="log" class="log"></div>
       </main>
     </section>

@@ -116,7 +116,7 @@ button:hover {
   margin-top: 0;
 }
 
-#stats {
+.stats-box {
   line-height: 1.8;
   background: rgba(255,255,255,0.03);
   border-radius: 10px;
@@ -144,15 +144,74 @@ button:hover {
   margin-bottom: 16px;
 }
 
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.tab-button {
+  background: rgba(255,255,255,0.04);
+  color: #dfeaf8;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: none;
+}
+
+.tab-button.active {
+  background: linear-gradient(180deg, #2d7dff, #215fd1);
+  color: white;
+  box-shadow: 0 4px 10px rgba(26, 92, 255, 0.25);
+}
+
+.tab-panel {
+  display: none;
+  margin-bottom: 16px;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+.content-box {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 14px;
+  min-height: 160px;
+}
+
 .log {
   background: #0c161d;
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 10px;
-  min-height: 300px;
+  min-height: 220px;
   padding: 14px;
   white-space: pre-wrap;
   line-height: 1.7;
   color: #eaf3ff;
+}
+
+.item-row, .quest-row, .shop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.item-row:last-child, .quest-row:last-child, .shop-row:last-child {
+  border-bottom: none;
+}
+
+.item-name, .quest-name, .shop-name {
+  flex: 1;
+}
+
+.small-btn {
+  padding: 8px 10px;
+  font-size: 0.9rem;
 }
 
 .hidden {
