@@ -5,7 +5,6 @@ const STORAGE_ID_KEY = 'rpg_current_id';
 
 let currentId = null;
 let currentCharacter = null;
-let authMode = 'register';
 
 const authScreen = document.getElementById('authScreen');
 const gameDiv = document.getElementById('game');
@@ -82,14 +81,10 @@ function restoreSessionState() {
     currentId = savedId;
     currentCharacter = parsed;
     return true;
-  } catch (err) {
+  } catch {
     clearSessionState();
     return false;
   }
-}
-
-function goToCityPage() {
-  window.location.href = '/city.html';
 }
 
 function setLog(text) {
@@ -111,8 +106,6 @@ function setActiveTab(name) {
 }
 
 function setAuthMode(mode) {
-  authMode = mode;
-
   modeButtons.forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.authMode === mode);
   });
@@ -131,6 +124,10 @@ function showGameScreen() {
 function showAuthScreen() {
   authScreen.classList.remove('hidden');
   gameDiv.classList.add('hidden');
+}
+
+function goToCityPage() {
+  window.location.href = '/city.html';
 }
 
 function renderCharacter(c) {
@@ -164,9 +161,7 @@ function renderCharacter(c) {
   `;
 
   const logoutBtn = document.getElementById('logoutBtn');
-  if (logoutBtn) {
-    logoutBtn.onclick = logoutGame;
-  }
+  if (logoutBtn) logoutBtn.onclick = logoutGame;
 
   gameStatus.textContent = `Игрок: ${c.name} • ${c.location} • Уровень ${c.level}`;
   showGameScreen();
@@ -191,6 +186,7 @@ function renderCharacterList(list) {
     item.onclick = async () => {
       const res = await api(`/api/character?id=${encodeURIComponent(char.id)}`);
       if (res.error) return alert(res.error);
+
       currentCharacter = res.character;
       currentId = res.character.id;
       saveSessionState();
@@ -203,9 +199,7 @@ function renderCharacterList(list) {
 
 async function loadCharacters() {
   const res = await api('/api/characters');
-  if (res.characters) {
-    renderCharacterList(res.characters);
-  }
+  if (res.characters) renderCharacterList(res.characters);
 }
 
 async function createCharacter() {
@@ -442,9 +436,11 @@ tabButtons.forEach((btn) => {
   btn.onclick = async () => {
     const name = btn.dataset.tab;
     setActiveTab(name);
+
     if (name === 'inventory') await renderInventoryTab();
     if (name === 'quests') await renderQuestsTab();
     if (name === 'shop') await renderShopTab();
+    if (name === 'profile') renderCharacter(currentCharacter);
   };
 });
 
@@ -466,12 +462,28 @@ async function restoreSession() {
   startGameBtn.classList.add('hidden');
 }
 
-const page = window.location.pathname;
-if (page === '/city.html') {
-  const hero = restoreSessionState();
-  if (!hero) {
-    window.location.href = '/';
-  }
+const params = new URLSearchParams(window.location.search);
+const mode = params.get('mode');
+
+if (mode === 'forest') {
+  setActiveTab('profile');
+  setLog('Вы вошли в лес');
+}
+if (mode === 'shop') {
+  setActiveTab('shop');
+  renderShopTab();
+}
+if (mode === 'inventory') {
+  setActiveTab('inventory');
+  renderInventoryTab();
+}
+if (mode === 'quests') {
+  setActiveTab('quests');
+  renderQuestsTab();
+}
+if (mode === 'profile') {
+  setActiveTab('profile');
+  renderCharacter(currentCharacter);
 }
 
 loadWorld();
