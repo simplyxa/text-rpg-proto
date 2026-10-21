@@ -13,6 +13,7 @@ const authPanels = document.querySelectorAll('.auth-panel');
 
 const newNicknameInput = document.getElementById('newNickname');
 const newClassInput = document.getElementById('newClass');
+const newFactionInput = document.getElementById('newFaction');
 const newPasswordInput = document.getElementById('newPassword');
 const createBtn = document.getElementById('createBtn');
 const startGameBtn = document.getElementById('startGameBtn');
@@ -39,6 +40,25 @@ const shopBtn = document.getElementById('shopBtn');
 
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('.tab-panel');
+
+const CLASS_NAMES = {
+  warrior: 'Воин',
+  healer: 'Лекарь',
+  mage: 'Маг'
+};
+
+const FACTION_NAMES = {
+  light: 'Светлые',
+  dark: 'Тёмные'
+};
+
+function getClassName(classId) {
+  return CLASS_NAMES[classId] || classId || 'Воин';
+}
+
+function getFactionName(factionId) {
+  return FACTION_NAMES[factionId] || factionId || 'Светлые';
+}
 
 function saveSessionState() {
   if (currentId && currentCharacter) {
@@ -135,8 +155,12 @@ function renderCharacter(c) {
   currentId = c.id;
   saveSessionState();
 
+  const className = getClassName(c.classId);
+  const factionName = getFactionName(c.faction || 'light');
+
   statsDiv.innerHTML = `
-    <strong>${c.name}</strong> (${c.classId})<br>
+    <strong>${c.name}</strong> (${className})<br>
+    Фракция: ${factionName}<br>
     Уровень: ${c.level}<br>
     HP: ${c.hp}/${c.maxHp}<br>
     Сила: ${c.str} | Ловкость: ${c.agi} | Интеллект: ${c.int}<br>
@@ -148,7 +172,8 @@ function renderCharacter(c) {
   profileContent.innerHTML = `
     <h3>Профиль героя</h3>
     <p><strong>Ник:</strong> ${c.name}</p>
-    <p><strong>Класс:</strong> ${c.classId}</p>
+    <p><strong>Класс:</strong> ${className}</p>
+    <p><strong>Фракция:</strong> ${factionName}</p>
     <p><strong>Уровень:</strong> ${c.level}</p>
     <p><strong>HP:</strong> ${c.hp}/${c.maxHp}</p>
     <p><strong>Сила:</strong> ${c.str}</p>
@@ -157,13 +182,49 @@ function renderCharacter(c) {
     <p><strong>Опыт:</strong> ${c.xp}/${c.xpToNext}</p>
     <p><strong>Золото:</strong> ${c.gold}</p>
     <p><strong>Локация:</strong> ${c.location}</p>
+
+    <label>
+      <span>Сменить класс</span>
+      <select id="classSelect">
+        <option value="warrior" ${c.classId === 'warrior' ? 'selected' : ''}>Воин</option>
+        <option value="healer" ${c.classId === 'healer' ? 'selected' : ''}>Лекарь</option>
+        <option value="mage" ${c.classId === 'mage' ? 'selected' : ''}>Маг</option>
+      </select>
+    </label>
+
+    <label>
+      <span>Сменить фракцию</span>
+      <select id="factionSelect">
+        <option value="light" ${(c.faction || 'light') === 'light' ? 'selected' : ''}>Светлые</option>
+        <option value="dark" ${(c.faction || 'light') === 'dark' ? 'selected' : ''}>Тёмные</option>
+      </select>
+    </label>
+
+    <button id="saveClassBtn" class="secondary-btn" type="button">Сохранить</button>
     <button id="logoutBtn" class="secondary-btn" type="button">Выйти</button>
   `;
 
+  const classSelect = document.getElementById('classSelect');
+  const factionSelect = document.getElementById('factionSelect');
+  const saveClassBtn = document.getElementById('saveClassBtn');
   const logoutBtn = document.getElementById('logoutBtn');
+
+  if (saveClassBtn) {
+    saveClassBtn.onclick = () => {
+      const nextClass = classSelect.value;
+      const nextFaction = factionSelect.value;
+
+      currentCharacter.classId = nextClass;
+      currentCharacter.faction = nextFaction;
+      saveSessionState();
+      renderCharacter(currentCharacter);
+      setLog(`Класс изменён на ${getClassName(nextClass)}. Фракция: ${getFactionName(nextFaction)}.`);
+    };
+  }
+
   if (logoutBtn) logoutBtn.onclick = logoutGame;
 
-  gameStatus.textContent = `Игрок: ${c.name} • ${c.location} • Уровень ${c.level}`;
+  gameStatus.textContent = `Игрок: ${c.name} • ${getFactionName(c.faction || 'light')} • ${className} • Уровень ${c.level}`;
   showGameScreen();
 }
 
@@ -180,7 +241,7 @@ function renderCharacterList(list) {
     item.className = 'character-item';
     item.innerHTML = `
       <strong>${char.name}</strong>
-      <div class="character-meta">${char.classId} • LV ${char.level}</div>
+      <div class="character-meta">${getClassName(char.classId)} • ${getFactionName(char.faction || 'light')} • LV ${char.level}</div>
     `;
 
     item.onclick = async () => {
@@ -205,6 +266,7 @@ async function loadCharacters() {
 async function createCharacter() {
   const nickname = newNicknameInput.value.trim();
   const classId = newClassInput.value;
+  const faction = newFactionInput.value;
   const password = newPasswordInput.value.trim();
 
   if (!nickname) return alert('Введите уникальный ник');
@@ -213,7 +275,7 @@ async function createCharacter() {
   const res = await api('/api/registerCharacter', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nickname, classId, password })
+    body: JSON.stringify({ nickname, classId, faction, password })
   });
 
   if (res.error) return alert(res.error);
