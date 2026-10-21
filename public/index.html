@@ -8,28 +8,39 @@
 </head>
 <body>
   <div id="app">
-    <header class="topbar">
-      <div>
-        <h1>RPG World</h1>
-      </div>
-      <div class="topbar-actions">
-        <button id="createBtn">Создать героя</button>
-      </div>
-    </header>
+    <div id="authScreen" class="auth-screen">
+      <div class="auth-card panel">
+        <div class="auth-header">
+          <span class="eyebrow">Добро пожаловать в</span>
+          <h1>RPG World</h1>
+        </div>
 
-    <section class="panel create-panel">
-      <input id="name" placeholder="Имя героя" />
-      <select id="class">
-        <option value="warrior">Воин</option>
-        <option value="rogue">Разбойник</option>
-        <option value="mage">Маг</option>
-      </select>
-    </section>
+        <div class="auth-form">
+          <label>
+            <span>Имя героя</span>
+            <input id="name" type="text" placeholder="Например: Артур" maxlength="24" />
+          </label>
 
-    <section class="panel char-list-panel">
-      <h3>Сохранённые герои</h3>
-      <div id="characterList"></div>
-    </section>
+          <label>
+            <span>Класс</span>
+            <select id="class">
+              <option value="warrior">Воин</option>
+              <option value="rogue">Разбойник</option>
+              <option value="mage">Маг</option>
+            </select>
+          </label>
+
+          <button id="createBtn" class="primary-btn">Создать персонажа</button>
+        </div>
+
+        <div class="heroes-box">
+          <div class="heroes-header">
+            <h3>Выбрать героя</h3>
+          </div>
+          <div id="characterList" class="character-list"></div>
+        </div>
+      </div>
+    </div>
 
     <section id="game" class="game hidden">
       <aside class="sidebar panel">

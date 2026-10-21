@@ -1,13 +1,15 @@
-const api = (url, options = {}) => fetch(url, options).then(r => r.json());
+const api = (url, options = {}) => fetch(url, options).then((r) => r.json());
 
 let currentId = null;
 let currentCharacter = null;
+
+const authScreen = document.getElementById('authScreen');
+const gameDiv = document.getElementById('game');
 
 const nameInput = document.getElementById('name');
 const classInput = document.getElementById('class');
 const createBtn = document.getElementById('createBtn');
 
-const gameDiv = document.getElementById('game');
 const statsDiv = document.getElementById('stats');
 const logDiv = document.getElementById('log');
 const gameStatus = document.getElementById('gameStatus');
@@ -39,9 +41,20 @@ function setActiveTab(name) {
   tabButtons.forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.tab === name);
   });
+
   tabPanels.forEach((panel) => {
     panel.classList.toggle('active', panel.id === `${name}-panel`);
   });
+}
+
+function showGameScreen() {
+  authScreen.classList.add('hidden');
+  gameDiv.classList.remove('hidden');
+}
+
+function showAuthScreen() {
+  authScreen.classList.remove('hidden');
+  gameDiv.classList.add('hidden');
 }
 
 function renderCharacter(c) {
@@ -73,21 +86,25 @@ function renderCharacter(c) {
   `;
 
   gameStatus.textContent = `Игрок: ${c.name} • ${c.location} • Уровень ${c.level}`;
-  gameDiv.classList.remove('hidden');
+  showGameScreen();
 }
 
 function renderCharacterList(list) {
   characterListDiv.innerHTML = '';
 
   if (!list || list.length === 0) {
-    characterListDiv.innerHTML = '<p>Нет сохранённых героев</p>';
+    characterListDiv.innerHTML = '<p>Нет сохранённых героев.</p>';
     return;
   }
 
   list.forEach((char) => {
     const item = document.createElement('button');
     item.className = 'character-item';
-    item.textContent = `${char.name} • ${char.classId} • LV ${char.level}`;
+    item.innerHTML = `
+      <strong>${char.name}</strong>
+      <div class="character-meta">${char.classId} • LV ${char.level}</div>
+    `;
+
     item.onclick = async () => {
       const res = await api(`/api/character?id=${encodeURIComponent(char.id)}`);
       if (res.error) return alert(res.error);
@@ -95,6 +112,7 @@ function renderCharacterList(list) {
       setActiveTab('profile');
       setLog('Герой загружен.');
     };
+
     characterListDiv.appendChild(item);
   });
 }
@@ -226,7 +244,7 @@ async function renderQuestsTab() {
       <div class="quest-name">
         <strong>${q.title}</strong><br>
         ${q.description}<br>
-        ${q.progress}/${q.target} • ${q.done ? 'Выполнено' : 'В процессе'}
+        ${q.progress}/${q.target} • ${q.done ? '��ыполнено' : 'В процессе'}
       </div>
     </div>
   `).join('');
@@ -260,13 +278,6 @@ async function renderShopTab() {
   };
 }
 
-async function refreshTabs() {
-  if (!currentId) return;
-  await renderInventoryTab();
-  await renderQuestsTab();
-  await renderShopTab();
-}
-
 async function loadWorld() {
   const data = await api('/api/world');
   if (data.locations) {
@@ -284,6 +295,7 @@ async function loadWorld() {
 }
 
 createBtn.onclick = createCharacter;
+
 fightBtn.onclick = fight;
 invBtn.onclick = async () => {
   setActiveTab('inventory');
@@ -311,4 +323,5 @@ tabButtons.forEach((btn) => {
 loadWorld();
 loadCharacters();
 setLog('Добро пожаловать. Создайте или выберите героя.');
+showAuthScreen();
 setActiveTab('profile');
