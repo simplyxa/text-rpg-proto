@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS characters (
   id TEXT PRIMARY KEY,
   name TEXT,
   classid TEXT,
+  faction TEXT DEFAULT 'light',
   level INTEGER,
   xp INTEGER,
   xptonext INTEGER,
@@ -21,6 +22,7 @@ CREATE TABLE IF NOT EXISTS characters (
 );
 
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS classid TEXT;
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS faction TEXT DEFAULT 'light';
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS level INTEGER;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS xp INTEGER;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS xptonext INTEGER;
