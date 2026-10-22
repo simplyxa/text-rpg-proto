@@ -177,6 +177,154 @@ function createDefaultQuests() {
   ];
 }
 
+const DAILY_QUEST_TEMPLATES = [
+  {
+    type: 'defeat_enemies',
+    name: 'Победить 5 врагов',
+    description: 'Победи 5 врагов в бою',
+    required: 5,
+    reward: { experience: 100, gold: 300 }
+  },
+  {
+    type: 'defeat_boss',
+    name: 'Победить босса',
+    description: 'Победи 1 босса',
+    required: 1,
+    reward: { experience: 200, gold: 500 }
+  },
+  {
+    type: 'loot_items',
+    name: 'Собрать 3 предмета',
+    description: 'Получи 3 предмета в боях',
+    required: 3,
+    reward: { experience: 150, gold: 400 }
+  },
+  {
+    type: 'visit_cave',
+    name: 'Посетить Пещеру',
+    description: 'Посети Пещеру и победи там врага',
+    required: 1,
+    reward: { experience: 100, gold: 200 }
+  },
+  {
+    type: 'purchase_items',
+    name: 'Купить 2 предмета',
+    description: 'Купи 2 предмета в магазине',
+    required: 2,
+    reward: { experience: 50, gold: 150 }
+  }
+];
+
+function getUtcDateKey(timestamp = Date.now()) {
+  return new Date(timestamp).toISOString().slice(0, 10);
+}
+
+function generateRandomQuests() {
+  const quests = DAILY_QUEST_TEMPLATES.map((quest) => ({ ...quest }));
+  for (let index = quests.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [quests[index], quests[randomIndex]] = [quests[randomIndex], quests[index]];
+  }
+  return quests.map((quest) => ({
+      ...quest,
+      id: `daily_${quest.type}`,
+      progress: 0,
+      status: 'active'
+  }));
+}
+
+function updateStreakCount(stats, today) {
+  const previousDate = new Date(`${today}T00:00:00.000Z`);
+  previousDate.setUTCDate(previousDate.getUTCDate() - 1);
+  if (stats.lastQuestCompletedDate !== previousDate.toISOString().slice(0, 10)) {
+    stats.streakDays = 0;
+  }
+}
+
+function initializeDailyQuests(character) {
+  const today = getUtcDateKey();
+  if (!Array.isArray(character.dailyQuests) || character.dailyQuests.length === 0) {
+    character.dailyQuests = generateRandomQuests();
+  }
+  if (!character.questStats || typeof character.questStats !== 'object') {
+    character.questStats = {
+      streakDays: 0,
+      lastQuestResetTime: Date.parse(`${today}T00:00:00.000Z`),
+      totalQuestsCompleted: 0,
+      todayEnemiesDefeated: 0,
+      todayBossesDefeated: 0,
+      todayItemsLooted: 0,
+      visitedCaveToday: false,
+      todayItemsPurchased: 0,
+      lastQuestCompletedDate: null
+    };
+    return;
+  }
+
+  const stats = character.questStats;
+  if (getUtcDateKey(stats.lastQuestResetTime || 0) !== today) {
+    updateStreakCount(stats, today);
+    character.dailyQuests = generateRandomQuests();
+    Object.assign(stats, {
+      lastQuestResetTime: Date.parse(`${today}T00:00:00.000Z`),
+      todayEnemiesDefeated: 0,
+      todayBossesDefeated: 0,
+      todayItemsLooted: 0,
+      visitedCaveToday: false,
+      todayItemsPurchased: 0
+    });
+  }
+  stats.streakDays = Number(stats.streakDays) || 0;
+  stats.totalQuestsCompleted = Number(stats.totalQuestsCompleted) || 0;
+}
+
+function calculateQuestProgress(quest, stats) {
+  const progressByType = {
+    defeat_enemies: stats.todayEnemiesDefeated,
+    defeat_boss: stats.todayBossesDefeated,
+    loot_items: stats.todayItemsLooted,
+    visit_cave: stats.visitedCaveToday ? 1 : 0,
+    purchase_items: stats.todayItemsPurchased
+  };
+  return Math.min(quest.required, Number(progressByType[quest.type]) || 0);
+}
+
+function updateDailyQuestProgress(character) {
+  initializeDailyQuests(character);
+  character.dailyQuests.forEach((quest) => {
+    quest.progress = calculateQuestProgress(quest, character.questStats);
+  });
+}
+
+function addDailyQuestProgress(character, eventType, amount = 1) {
+  initializeDailyQuests(character);
+  const statByEvent = {
+    defeat_enemies: 'todayEnemiesDefeated',
+    defeat_boss: 'todayBossesDefeated',
+    loot_items: 'todayItemsLooted',
+    purchase_items: 'todayItemsPurchased'
+  };
+  if (eventType === 'visit_cave') character.questStats.visitedCaveToday = true;
+  else if (statByEvent[eventType]) character.questStats[statByEvent[eventType]] += amount;
+  updateDailyQuestProgress(character);
+}
+
+function awardDailyQuestReward(character, quest) {
+  character.xp += quest.reward.experience;
+  character.gold += quest.reward.gold;
+  const equipmentBonuses = getEquipmentBonuses(character.equipment);
+  while (character.xp >= character.xpToNext) {
+    character.xp -= character.xpToNext;
+    character.level += 1;
+    character.str += 1;
+    character.agi += 1;
+    character.int += 1;
+    character.maxHp += 5;
+    character.hp = character.maxHp + equipmentBonuses.maxHp;
+    character.xpToNext = Math.round(character.xpToNext * 1.4);
+  }
+}
+
 function buildCharacter(name, classId, passwordHash, faction = 'light', id = uid()) {
   const base = { hp: 30, str: 5, agi: 4, int: 3 };
   if (classId === 'warrior') base.str += 2;
@@ -206,6 +354,8 @@ function buildCharacter(name, classId, passwordHash, faction = 'light', id = uid
     ],
     equipment: createDefaultEquipment(),
     quests: createDefaultQuests(),
+    dailyQuests: [],
+    questStats: null,
     passwordHash: passwordHash || null,
     createdAt: Date.now()
   };
@@ -245,6 +395,8 @@ function serializeCharacter(character) {
     inventory: JSON.stringify(character.inventory || []),
     equipment: JSON.stringify(character.equipment || createDefaultEquipment()),
     quests: JSON.stringify(character.quests || []),
+    dailyquests: JSON.stringify(character.dailyQuests || []),
+    queststats: JSON.stringify(character.questStats || null),
     passwordHash: character.passwordHash || null,
     createdAt: character.createdAt || Date.now()
   };
@@ -260,6 +412,17 @@ function deserializeCharacter(row) {
   const quests = Array.isArray(row.quests)
     ? row.quests
     : (typeof row.quests === 'string' ? JSON.parse(row.quests || JSON.stringify(createDefaultQuests())) : createDefaultQuests());
+  const dailyQuests = Array.isArray(row.dailyquests)
+    ? row.dailyquests
+    : (typeof row.dailyquests === 'string' ? JSON.parse(row.dailyquests || '[]') : []);
+  let questStats = row.queststats;
+  if (typeof questStats === 'string') {
+    try {
+      questStats = JSON.parse(questStats || 'null');
+    } catch {
+      questStats = null;
+    }
+  }
 
   let equipment = row.equipment;
   if (typeof equipment === 'string') {
@@ -293,6 +456,8 @@ function deserializeCharacter(row) {
     inventory,
     equipment,
     quests,
+    dailyQuests,
+    questStats,
     passwordHash: row.passwordhash || row.passwordHash,
     createdAt: row.createdat || row.createdAt
   };
@@ -322,6 +487,8 @@ async function initDatabase() {
     'inventory TEXT',
     'equipment TEXT',
     'quests TEXT',
+    'dailyquests TEXT',
+    'queststats TEXT',
     'passwordhash TEXT',
     'createdat BIGINT'
   ];
@@ -354,6 +521,8 @@ async function initDatabase() {
       inventory TEXT,
       equipment TEXT,
       quests TEXT,
+      dailyquests TEXT,
+      queststats TEXT,
       passwordhash TEXT,
       createdat BIGINT
     )
@@ -375,8 +544,8 @@ async function saveCharacter(character) {
   const row = serializeCharacter(character);
   await pool.query(
     `INSERT INTO characters (
-      id, name, classid, faction, level, xp, xptonext, maxhp, hp, str, agi, int, gold, location, kills, inventory, equipment, quests, passwordhash, createdat
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+      id, name, classid, faction, level, xp, xptonext, maxhp, hp, str, agi, int, gold, location, kills, inventory, equipment, quests, dailyquests, queststats, passwordhash, createdat
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
       classid = EXCLUDED.classid,
@@ -395,6 +564,8 @@ async function saveCharacter(character) {
       inventory = EXCLUDED.inventory,
       equipment = EXCLUDED.equipment,
       quests = EXCLUDED.quests,
+      dailyquests = EXCLUDED.dailyquests,
+      queststats = EXCLUDED.queststats,
       passwordhash = EXCLUDED.passwordhash,
       createdat = EXCLUDED.createdat`,
     [
@@ -416,6 +587,8 @@ async function saveCharacter(character) {
       row.inventory,
       row.equipment,
       row.quests,
+      row.dailyquests,
+      row.queststats,
       row.passwordHash,
       row.createdAt
     ]
@@ -508,6 +681,7 @@ app.get('/api/character', async (req, res) => {
   const char = await loadCharacterById(id);
   if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
 
+  initializeDailyQuests(char);
   updateQuests(char);
   await saveCharacter(char);
   res.json({ character: stripPassword(withEquipmentBonuses(char)) });
@@ -573,6 +747,8 @@ app.post('/api/fight', async (req, res) => {
 
   if (char.hp > 0) {
     char.kills += 1;
+    addDailyQuestProgress(char, 'defeat_enemies');
+    if (char.location === 'cave') addDailyQuestProgress(char, 'visit_cave');
     char.xp += monster.xp;
     char.gold += monster.gold;
     log.push(`${char.name} победил(а) ${monster.name}! Получено ${monster.xp} XP и ${monster.gold} золота.`);
@@ -596,8 +772,10 @@ app.post('/api/fight', async (req, res) => {
         existing.qty += loot.qty;
       } else {
         char.inventory.push(loot);
+        addDailyQuestProgress(char, 'loot_items');
       }
       log.push(`Найден предмет: ${loot.name} x${loot.qty}`);
+      addDailyQuestProgress(char, 'loot_items');
     }
 
     const equipmentDropChance = monster.rarity === 'rare' ? 0.03 : 0.2;
@@ -696,6 +874,7 @@ function grantReward(char, reward, log, { equipmentChance, equipmentRarity }) {
   if (Math.random() < equipmentChance) {
     const loot = createEquipmentDrop(equipmentRarity);
     char.inventory.push(loot);
+    addDailyQuestProgress(char, 'loot_items');
     log.push(`Найдено снаряжение: ${loot.name} (${loot.slot}), бонусы: ${describeBonuses(loot)}.`);
   }
 }
@@ -780,6 +959,8 @@ app.post('/api/fight/attack', async (req, res) => {
     log.push(target.isBoss ? 'Босс повержен!' : 'Враг повержен!');
     if (!target.isBoss) {
       char.kills += 1;
+      addDailyQuestProgress(char, 'defeat_enemies');
+      if (session.location === 'cave') addDailyQuestProgress(char, 'visit_cave');
       grantReward(char, target, log, { equipmentChance: session.location === 'cave' ? 0.3 : 0.2, equipmentRarity: 'common' });
       updateQuests(char);
     }
@@ -840,6 +1021,7 @@ app.post('/api/fight/bosses/defeat', async (req, res) => {
   const boss = session.enemies[0];
   const log = ['Босс повержен! Вы победили пещеру!'];
   char.kills += 1;
+  addDailyQuestProgress(char, 'defeat_boss');
   grantReward(char, boss, log, { equipmentChance: 1, equipmentRarity: 'rare' });
   updateQuests(char);
   char.location = 'town';
@@ -853,6 +1035,7 @@ const PAGES = {
   '/forest': 'forest.html',
   '/cave': 'cave.html',
   '/character': 'character.html',
+  '/quests': 'quests.html',
   '/fight': 'fight.html',
   '/inventory': 'inventory.html',
   '/equipment': 'equipment.html',
@@ -963,6 +1146,72 @@ app.get('/api/quests', async (req, res) => {
   res.json({ quests: char.quests });
 });
 
+app.get('/api/daily-quests', async (req, res) => {
+  const { id } = req.query;
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
+  initializeDailyQuests(char);
+  updateDailyQuestProgress(char);
+  await saveCharacter(char);
+  res.json({
+    dailyQuests: char.dailyQuests,
+    questStats: char.questStats,
+    character: stripPassword(withEquipmentBonuses(char))
+  });
+});
+
+app.post('/api/daily-quests/complete', async (req, res) => {
+  const { id, questId } = req.body;
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+  initializeDailyQuests(char);
+  updateDailyQuestProgress(char);
+  const quest = char.dailyQuests.find((candidate) => candidate.id === questId);
+  if (!quest || quest.status !== 'active') {
+    return res.status(400).json({ error: 'Активный квест не найден.' });
+  }
+  if (quest.progress < quest.required) {
+    return res.status(400).json({ error: 'Квест ещё не выполнен.' });
+  }
+
+  quest.status = 'completed';
+  awardDailyQuestReward(char, quest);
+  const today = getUtcDateKey();
+  if (char.questStats.lastQuestCompletedDate !== today) {
+    const yesterday = new Date(`${today}T00:00:00.000Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    char.questStats.streakDays = char.questStats.lastQuestCompletedDate === yesterday.toISOString().slice(0, 10)
+      ? char.questStats.streakDays + 1
+      : 1;
+    char.questStats.lastQuestCompletedDate = today;
+  }
+  char.questStats.totalQuestsCompleted += 1;
+  await saveCharacter(char);
+  res.json({
+    dailyQuests: char.dailyQuests,
+    questStats: char.questStats,
+    character: stripPassword(withEquipmentBonuses(char))
+  });
+});
+
+app.post('/api/daily-quests/skip', async (req, res) => {
+  const { id, questId } = req.body;
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+  initializeDailyQuests(char);
+  const quest = char.dailyQuests.find((candidate) => candidate.id === questId);
+  if (!quest || quest.status !== 'active') {
+    return res.status(400).json({ error: 'Активный квест не найден.' });
+  }
+  quest.status = 'skipped';
+  await saveCharacter(char);
+  res.json({
+    dailyQuests: char.dailyQuests,
+    questStats: char.questStats,
+    character: stripPassword(withEquipmentBonuses(char))
+  });
+});
+
 app.post('/api/buyPotion', async (req, res) => {
   const { id } = req.body;
   const char = await loadCharacterById(id);
@@ -974,6 +1223,7 @@ app.post('/api/buyPotion', async (req, res) => {
   if (existing) existing.qty += 1;
   else char.inventory.push({ id: 'potion', name: 'Зелье лечения', qty: 1, heal: 15 });
 
+  addDailyQuestProgress(char, 'purchase_items');
   await saveCharacter(char);
   res.json({ message: 'Куплено зелье лечения.', character: stripPassword(withEquipmentBonuses(char)) });
 });
@@ -995,6 +1245,7 @@ app.post('/api/buyEquipment', async (req, res) => {
     'common',
     item.statBonus
   ));
+  addDailyQuestProgress(char, 'purchase_items');
   await saveCharacter(char);
   res.json({ message: `Куплено: ${item.name}.`, character: stripPassword(withEquipmentBonuses(char)) });
 });
@@ -1015,6 +1266,7 @@ app.post('/api/buyEquipmentSet', async (req, res) => {
     'common',
     item.statBonus
   )));
+  addDailyQuestProgress(char, 'purchase_items', SHOP_EQUIPMENT.length);
   await saveCharacter(char);
   res.json({ message: 'Куплен полный комплект снаряжения.', character: stripPassword(withEquipmentBonuses(char)) });
 });

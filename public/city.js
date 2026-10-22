@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (action === 'shop') window.location.href = '/shop';
       if (action === 'inventory') window.location.href = '/inventory';
-      if (action === 'quests') window.location.href = '/?mode=quests';
+      if (action === 'quests') window.location.href = '/quests';
       if (action === 'profile') window.location.href = '/character';
     };
   });

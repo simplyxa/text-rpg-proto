@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS characters (
   inventory TEXT,
   equipment TEXT,
   quests TEXT,
+  dailyquests TEXT,
+  queststats TEXT,
   passwordhash TEXT,
   createdat BIGINT
 );
@@ -37,5 +39,7 @@ ALTER TABLE characters ADD COLUMN IF NOT EXISTS kills INTEGER;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS inventory TEXT;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS equipment TEXT;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS quests TEXT;
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS dailyquests TEXT;
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS queststats TEXT;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS passwordhash TEXT;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS createdat BIGINT;
