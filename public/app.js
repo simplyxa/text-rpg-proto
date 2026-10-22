@@ -86,18 +86,21 @@ const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Интел�
 const EQUIPMENT_ARMOR = { helmet: 2, ring: 1, chest: 5, hands: 1, armor: 2, boots: 1, shield: 3, cloak: 0 };
 const SHOP_ITEM_ARMOR = { Шлем: 2, Амулет: 1, Броня: 5, Перчатки: 1, Штаны: 2, Сапоги: 1, 'Левый клинок': 0, 'Правый клинок': 3 };
 const POTIONS = {
-  potion_health: { name: 'Зелье Здоровья', effect: '+50 HP', icon: 'potion-health.svg' },
-  potion_mana: { name: 'Зелье Маны', effect: '+30 Mana', icon: 'potion-mana.svg' },
-  potion_strength: { name: 'Зелье Усиления', effect: '+5 Урона на 10 сек', icon: 'potion-strength.svg' },
-  potion_armor: { name: 'Зелье Защиты', effect: '+10 Защиты на 10 сек', icon: 'potion-armor.svg' }
+  potion_health: { name: 'Зелье', effect: 'Восстанавливает 100% HP и энергии', icon: 'potion-health.svg' }
 };
+const LEGACY_POTION_IDS = ['potion', 'potion_mana', 'potion_strength', 'potion_armor'];
 
 function cleanInventory(inventory = []) {
-  return inventory
+  const cleaned = [];
+  inventory
     .filter((item) => item?.id !== 'food' && item?.name !== 'Пирожок')
-    .map((item) => item?.id === 'potion'
-      ? { ...item, id: 'potion_health', name: POTIONS.potion_health.name, heal: 50 }
-      : item);
+    .forEach((item) => {
+      if (item?.id !== 'potion_health' && !LEGACY_POTION_IDS.includes(item?.id)) return cleaned.push(item);
+      const existing = cleaned.find((entry) => entry.id === 'potion_health');
+      if (existing) existing.qty = (Number(existing.qty) || 0) + (Number(item.qty) || 0);
+      else cleaned.push({ id: 'potion_health', name: POTIONS.potion_health.name, effect: POTIONS.potion_health.effect, qty: Number(item.qty) || 0 });
+    });
+  return cleaned;
 }
 
 const CLASS_SKILLS = {
@@ -229,6 +232,7 @@ function saveSessionState() {
     currentCharacter.inventory = cleanInventory(currentCharacter.inventory);
     localStorage.setItem(STORAGE_ID_KEY, String(currentId));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCharacter));
+    window.renderHpBar?.();
     window.updateExperienceBar?.(currentCharacter.xp, currentCharacter.xpToNext, currentCharacter.level);
   } else {
     localStorage.removeItem(STORAGE_ID_KEY);

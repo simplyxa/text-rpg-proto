@@ -24,11 +24,9 @@ const pool = new Pool({
 
 const EQUIPMENT_SLOTS = ['helmet', 'chest', 'shield', 'hands', 'armor', 'boots', 'cloak', 'ring'];
 const POTIONS = {
-  potion_health: { name: 'Зелье Здоровья', effect: '+50 HP', type: 'health' },
-  potion_mana: { name: 'Зелье Маны', effect: '+30 Mana', type: 'mana' },
-  potion_strength: { name: 'Зелье Усиления', effect: '+5 Урона на 10 сек', type: 'strength' },
-  potion_armor: { name: 'Зелье Защиты', effect: '+10 Защиты на 10 сек', type: 'armor' }
+  potion_health: { name: 'Зелье', effect: 'Восстанавливает 100% HP и энергии', type: 'full' }
 };
+const LEGACY_POTION_IDS = ['potion', 'potion_mana', 'potion_strength', 'potion_armor'];
 
 const LOCATIONS = [
   { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
@@ -217,11 +215,16 @@ function getActivePotionBonuses(character) {
 }
 
 function sanitizeInventory(inventory = []) {
-  return inventory
+  const merged = [];
+  inventory
     .filter((item) => item?.id !== 'food' && item?.name !== 'Пирожок')
-    .map((item) => item?.id === 'potion'
-      ? { ...item, id: 'potion_health', name: POTIONS.potion_health.name, heal: 50 }
-      : item)
+    .forEach((item) => {
+      if (item?.id !== 'potion_health' && !LEGACY_POTION_IDS.includes(item?.id)) return merged.push(item);
+      const existing = merged.find((entry) => entry.id === 'potion_health');
+      if (existing) existing.qty = (Number(existing.qty) || 0) + (Number(item.qty) || 0);
+      else merged.push({ id: 'potion_health', name: POTIONS.potion_health.name, effect: POTIONS.potion_health.effect, qty: Number(item.qty) || 0 });
+    });
+  return merged
     .map((item) => item?.slot
       ? { ...item, rarity: ['common', 'rare', 'epic', 'legendary'].includes(item.rarity) ? item.rarity : 'common' }
       : item);
@@ -231,7 +234,7 @@ function hasLegacyInventoryItems(row) {
   const inventory = Array.isArray(row.inventory)
     ? row.inventory
     : (typeof row.inventory === 'string' ? JSON.parse(row.inventory || '[]') : []);
-  return inventory.some((item) => item?.id === 'food' || item?.id === 'potion' || item?.name === 'Пирожок');
+  return inventory.some((item) => item?.id === 'food' || LEGACY_POTION_IDS.includes(item?.id) || item?.name === 'Пирожок');
 }
 
 function randInt(min, max) {
@@ -488,7 +491,7 @@ function buildCharacter(name, classId, passwordHash, faction = 'light', id = uid
     location: 'town',
     kills: 0,
     inventory: [
-      { id: 'potion_health', name: POTIONS.potion_health.name, qty: 2, heal: 50 },
+      { id: 'potion_health', name: POTIONS.potion_health.name, effect: POTIONS.potion_health.effect, qty: 2 },
       ...createEquipmentInventory()
     ],
     equipment: createDefaultEquipment(),
@@ -1462,30 +1465,19 @@ app.post('/api/useItem', async (req, res) => {
 });
 
 app.post('/api/usePotion', async (req, res) => {
-  const { id, potionId } = req.body;
-  const potion = POTIONS[potionId];
-  if (!id || !potion) return res.status(400).json({ error: 'Неизвестное зелье.' });
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'Нужно id персонажа.' });
+  const potion = POTIONS.potion_health;
   const char = await loadCharacterById(id);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
 
-  const index = char.inventory.findIndex((item) => item.id === potionId && item.qty > 0);
-  if (index < 0) return res.status(400).json({ error: 'Этого зелья нет в инвентаре.' });
+  const index = char.inventory.findIndex((item) => item.id === 'potion_health' && item.qty > 0);
+  if (index < 0) return res.status(400).json({ error: 'Зелий нет.' });
 
   const [item] = char.inventory.splice(index, 1);
   if (item.qty > 1) char.inventory.push({ ...item, qty: item.qty - 1 });
-  if (potion.type === 'health') {
-    const maxHp = char.maxHp + getEquipmentBonuses(char.equipment).maxHp;
-    char.hp = Math.min(maxHp, char.hp + 50);
-  } else if (potion.type === 'mana') {
-    char.mana = Math.min(char.maxMana, char.mana + 30);
-  } else {
-    char.potionEffects = (char.potionEffects || []).filter((effect) => effect.expiresAt > Date.now());
-    char.potionEffects.push({
-      type: potion.type,
-      value: potion.type === 'strength' ? 5 : 10,
-      expiresAt: Date.now() + 10_000
-    });
-  }
+  char.hp = char.maxHp + getEquipmentBonuses(char.equipment).maxHp;
+  char.mana = char.maxMana;
 
   await saveCharacter(char);
   res.json({ message: `Использовано: ${potion.name} (${potion.effect}).`, character: stripPassword(withEquipmentBonuses(char)) });
@@ -1575,7 +1567,7 @@ app.post('/api/buyPotion', async (req, res) => {
   if (char.gold < 10) return res.status(400).json({ error: 'Недостаточно золота.' });
 
   char.gold = spendGold(char.gold, 10);
-  const potionId = POTIONS[req.body.potionId] ? req.body.potionId : 'potion_health';
+  const potionId = 'potion_health';
   const existing = char.inventory.find((item) => item.id === potionId);
   if (existing) existing.qty += 1;
   else char.inventory.push({ id: potionId, name: POTIONS[potionId].name, effect: POTIONS[potionId].effect, qty: 1 });

@@ -1,18 +1,21 @@
 const STORAGE_KEY = 'rpg_current_character';
 const STORAGE_ID_KEY = 'rpg_current_id';
 const POTIONS = {
-  potion_health: { name: 'Зелье Здоровья', effect: '+50 HP', icon: 'potion-health.svg' },
-  potion_mana: { name: 'Зелье Маны', effect: '+30 Mana', icon: 'potion-mana.svg' },
-  potion_strength: { name: 'Зелье Усиления', effect: '+5 Урона на 10 сек', icon: 'potion-strength.svg' },
-  potion_armor: { name: 'Зелье Защиты', effect: '+10 Защиты на 10 сек', icon: 'potion-armor.svg' }
+  potion_health: { name: 'Зелье', effect: 'Восстанавливает 100% HP и энергии', icon: 'potion-health.svg' }
 };
+const LEGACY_POTION_IDS = ['potion', 'potion_mana', 'potion_strength', 'potion_armor'];
 
 function cleanInventory(inventory = []) {
-  return inventory
+  const cleaned = [];
+  inventory
     .filter((item) => item?.id !== 'food' && item?.name !== 'Пирожок')
-    .map((item) => item?.id === 'potion'
-      ? { ...item, id: 'potion_health', name: POTIONS.potion_health.name, heal: 50 }
-      : item);
+    .forEach((item) => {
+      if (item?.id !== 'potion_health' && !LEGACY_POTION_IDS.includes(item?.id)) return cleaned.push(item);
+      const existing = cleaned.find((entry) => entry.id === 'potion_health');
+      if (existing) existing.qty = (Number(existing.qty) || 0) + (Number(item.qty) || 0);
+      else cleaned.push({ id: 'potion_health', name: POTIONS.potion_health.name, effect: POTIONS.potion_health.effect, qty: Number(item.qty) || 0 });
+    });
+  return cleaned;
 }
 
 function clearSessionState() {
@@ -41,6 +44,7 @@ function restoreSessionState() {
     if (!parsed || !parsed.id) return null;
     const character = { id: savedId, ...parsed, inventory: cleanInventory(parsed.inventory) };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(character));
+    window.renderHpBar?.();
     return character;
   } catch (error) {
     clearSessionState();
@@ -75,6 +79,9 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
   const faction = character.faction === 'dark' ? 'Тёмные' : 'Светлые';
   const classNames = { warrior: 'Воин', rogue: 'Разбойник', mage: 'Маг' };
   const className = classNames[character.classId] || character.classId || 'Воин';
+  const potionCount = cleanInventory(character.inventory)
+    .filter((item) => item.id === 'potion_health')
+    .reduce((total, item) => total + (Number(item.qty) || 0), 0);
   const name = escapeHTML(character.name || 'Герой');
   const initials = escapeHTML((character.name || 'Г').trim().charAt(0).toUpperCase() || 'Г');
 
@@ -138,19 +145,14 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
       <h2 id="resourcesHeading">Ресурсы</h2>
       <dl class="profile-rows profile-details">
         <div><dt>Ресурсы</dt><dd>12 дерева · 4 руды</dd></div>
+        <div><dt>Зелья</dt><dd>${potionCount} <button class="small-btn potion-use-button" type="button" data-use-potion ${potionCount > 0 ? '' : 'disabled'}>Использовать</button></dd></div>
       </dl>
     </section>
 
-    <section class="profile-section profile-extra" aria-label="Дополнительные характеристики">
-      <div class="profile-current-stats">
-        <span>Ловкость <strong>${Number(character.agi) || 0}</strong></span>
-        <span>Интеллект <strong>${Number(character.int) || 0}</strong></span>
-        <span>Локация <strong>${escapeHTML(character.location || 'town')}</strong></span>
-      </div>
-    </section>
   `;
 
-  characterCard.querySelector('#profileResources').append(renderPotions(character));
+  const potionButton = characterCard.querySelector('[data-use-potion]');
+  if (potionButton) potionButton.onclick = usePotion;
 
   document.querySelectorAll('[data-profile-placeholder]').forEach((link) => {
     link.onclick = (event) => {
@@ -161,64 +163,20 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
   });
 }
 
-function renderPotions(character) {
-  const section = document.createElement('section');
-  section.className = 'potions-section';
-  const heading = document.createElement('h2');
-  heading.textContent = 'Зелья';
-  const list = document.createElement('div');
-  list.className = 'potions-list';
-  section.append(heading, list);
-
-  const potions = cleanInventory(character.inventory).filter((item) => POTIONS[item.id] && Number(item.qty) > 0);
-  if (!potions.length) {
-    const empty = document.createElement('p');
-    empty.textContent = 'Нет зелий.';
-    list.append(empty);
-    return section;
-  }
-
-  potions.forEach((item) => {
-    const potion = POTIONS[item.id];
-    const card = document.createElement('article');
-    card.className = 'potion-card';
-    const icon = document.createElement('img');
-    icon.src = `/images/potions/${potion.icon}`;
-    icon.alt = '';
-    icon.setAttribute('aria-hidden', 'true');
-    const details = document.createElement('div');
-    details.className = 'potion-details';
-    const name = document.createElement('strong');
-    name.textContent = potion.name;
-    const effect = document.createElement('span');
-    effect.textContent = potion.effect;
-    const quantity = document.createElement('span');
-    quantity.textContent = `Количество: ${item.qty}`;
-    details.append(name, effect, quantity);
-    const button = document.createElement('button');
-    button.className = 'small-btn potion-use-button';
-    button.type = 'button';
-    button.textContent = 'Использовать';
-    button.addEventListener('click', () => usePotion(item.id));
-    card.append(icon, details, button);
-    list.append(card);
-  });
-  return section;
-}
-
-async function usePotion(potionId) {
+async function usePotion() {
   const characterId = localStorage.getItem(STORAGE_ID_KEY);
   const message = document.getElementById('profileMessage');
   try {
     const response = await fetch('/api/usePotion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: characterId, potionId })
+      body: JSON.stringify({ id: characterId })
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Не удалось использовать зелье.');
     const character = { ...result.character, inventory: cleanInventory(result.character.inventory) };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(character));
+    window.renderHpBar?.();
     message.textContent = result.message || '';
     renderCharacterPage(character);
   } catch (error) {

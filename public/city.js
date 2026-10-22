@@ -33,7 +33,8 @@ function loadHero() {
 
   document.getElementById('heroName').textContent = hero.name;
   document.getElementById('cityTitle').textContent = hero.faction === 'dark' ? 'Тёмные' : 'Светлые';
-  document.getElementById('hubGold').textContent = Number(hero.gold) || 0;
+  const hp = Number(hero.hp) || 0;
+  document.getElementById('hubHp').textContent = `${hp}/${Number(hero.maxHp) || hp}`;
   document.getElementById('hubEnergy').textContent = Number(hero.mana) || 100;
 
   return hero;
