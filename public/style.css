@@ -2,25 +2,34 @@
 
 :root {
   color-scheme: dark;
-  --primary-color: #7c3aed;
-  --secondary-color: #a855f7;
-  --accent-neon: #00ffff;
-  --dark-bg: #0a0a0a;
-  --dark-bg-lighter: #0a0a1f;
-  --text-primary: #e0e0e0;
-  --text-secondary: #aaa;
-  --text-muted: #888;
-  --border-color: rgba(168, 85, 247, 0.3);
-  --panel-bg: rgba(10, 10, 26, 0.85);
+  /* Тема «Город»: единые токены для всех страниц */
+  --city-gold: #c8a45a;
+  --city-gold-light: #e2c77e;
+  --city-gold-text: #d7bc78;
+  --city-teal: #85cbb5;
+  --city-border: rgba(194, 159, 84, 0.28);
+  --city-divider: rgba(213, 215, 210, 0.12);
+  --city-radius: 4px;
+  --city-shadow: 0 18px 55px rgba(0, 0, 0, 0.42);
+  --primary-color: var(--city-gold);
+  --secondary-color: var(--city-gold-text);
+  --accent-neon: var(--city-gold-text);
+  --dark-bg: #0b0c0c;
+  --dark-bg-lighter: #101111;
+  --text-primary: #e8e6df;
+  --text-secondary: #b6b7b5;
+  --text-muted: #8f918d;
+  --border-color: var(--city-border);
+  --panel-bg: #101111;
   --surface-bg: rgba(255, 255, 255, 0.035);
-  --input-bg: #0f0f1f;
+  --input-bg: #161717;
   --battle-bg: #050505;
   --common: #fff;
   --rare: #55aaff;
   --epic: #c084fc;
   --legendary: #ff9f43;
-  --purple-glow: rgba(168, 85, 247, 0.5);
-  --neon-glow: rgba(0, 255, 255, 0.35);
+  --purple-glow: rgba(194, 159, 84, 0.25);
+  --neon-glow: rgba(0, 0, 0, 0.35);
   font-family: 'Roboto', sans-serif;
   color: var(--text-primary);
   background: var(--dark-bg);
@@ -126,22 +135,28 @@ select,
 
 button {
   padding: 12px 24px;
-  border: 0;
-  border-radius: 8px;
-  color: #fff;
+  color: var(--city-gold-text);
   font-family: 'Roboto', sans-serif;
   font-weight: 500;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-  box-shadow: 0 0 20px var(--purple-glow);
+  border: 1px solid var(--city-border);
+  border-radius: var(--city-radius);
+  background: rgba(215, 188, 120, 0.06);
+  box-shadow: none;
 }
 
-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 30px var(--accent-neon);
+button:hover:not(:disabled) {
+  color: var(--city-gold-light);
+  background: rgba(215, 188, 120, 0.12);
+  box-shadow: inset 3px 0 var(--city-gold);
 }
 
-button:active {
-  transform: scale(0.98);
+button:active:not(:disabled) {
+  background: rgba(215, 188, 120, 0.2);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 button:focus-visible,
@@ -154,13 +169,12 @@ select:focus-visible {
 
 a {
   color: var(--accent-neon);
-  text-decoration-color: rgba(0, 255, 255, 0.45);
+  text-decoration-color: rgba(215, 188, 120, 0.45);
   text-underline-offset: 0.2em;
 }
 
 a:hover {
-  color: var(--text-primary);
-  text-shadow: 0 0 12px var(--accent-neon);
+  color: var(--city-gold-light);
 }
 
 h1,
@@ -168,22 +182,23 @@ h2,
 h3,
 h4 {
   color: var(--text-primary);
-  font-family: 'Cinzel', serif;
+  font-family: 'Roboto', sans-serif;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  text-shadow: 0 0 10px var(--secondary-color), 0 0 20px var(--primary-color);
+  letter-spacing: 0.03em;
+  text-shadow: none;
 }
 
 h1 {
-  font-size: clamp(2rem, 5vw, 3.25rem);
+  color: var(--city-gold-light);
+  font-size: clamp(1.55rem, 6vw, 2rem);
 }
 
 h2 {
-  font-size: clamp(1.5rem, 3vw, 2.15rem);
+  font-size: clamp(1.2rem, 3vw, 1.5rem);
 }
 
 h3 {
-  font-size: clamp(1.15rem, 2.5vw, 1.55rem);
+  font-size: clamp(1.05rem, 2.5vw, 1.25rem);
 }
 
 #app {
@@ -205,11 +220,10 @@ h3 {
 .card,
 .content-box {
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: var(--city-radius);
   background: var(--panel-bg);
-  box-shadow: 0 0 20px var(--neon-glow);
+  box-shadow: var(--city-shadow);
   padding: 20px;
-  backdrop-filter: blur(12px);
 }
 
 .auth-card {
@@ -219,15 +233,15 @@ h3 {
   padding: 28px 30px 30px;
   border-radius: 20px;
   background:
-    radial-gradient(ellipse at 50% 0, rgba(124, 58, 237, 0.18), transparent 55%),
+    radial-gradient(ellipse at 50% 0, rgba(194, 159, 84, 0.18), transparent 55%),
     var(--panel-bg);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 30px rgba(124, 58, 237, 0.12);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 30px rgba(194, 159, 84, 0.12);
 }
 
 .auth-card::before {
   position: absolute;
   inset: 0;
-  border-top: 1px solid rgba(0, 255, 255, 0.25);
+  border-top: 1px solid rgba(215, 188, 120, 0.25);
   content: '';
   pointer-events: none;
 }
@@ -301,7 +315,7 @@ h3 {
 .auth-panel {
   display: none;
   padding: 18px;
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  border: 1px solid rgba(194, 159, 84, 0.2);
   border-radius: 14px;
   background: rgba(10, 10, 31, 0.55);
   animation: fadeIn 0.3s ease both;
@@ -331,7 +345,7 @@ h3 {
   align-items: center;
   border: 1px solid var(--border-color);
   border-radius: 999px;
-  background: rgba(124, 58, 237, 0.16);
+  background: rgba(194, 159, 84, 0.16);
   color: var(--text-primary);
 }
 
@@ -368,7 +382,7 @@ select {
   min-width: 0;
   min-height: 44px;
   padding: 10px 14px;
-  border: 1px solid rgba(168, 85, 247, 0.25);
+  border: 1px solid rgba(194, 159, 84, 0.25);
   border-radius: 8px;
   outline: none;
   background: var(--input-bg);
@@ -382,7 +396,7 @@ input::placeholder {
 input:focus,
 select:focus {
   border-color: var(--accent-neon);
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+  box-shadow: 0 0 15px rgba(215, 188, 120, 0.5);
 }
 
 select option {
@@ -397,12 +411,8 @@ select option {
 }
 
 .secondary-btn {
-  background: linear-gradient(135deg, #312052, #54256c);
-  box-shadow: 0 0 16px rgba(168, 85, 247, 0.25);
-}
-
-.secondary-btn:hover {
-  box-shadow: 0 0 25px var(--accent-neon);
+  color: var(--text-secondary);
+  background: transparent;
 }
 
 .helper-text {
@@ -511,7 +521,7 @@ select option {
 .skill-box,
 .equipment-total {
   padding: 12px;
-  border: 1px solid rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(194, 159, 84, 0.18);
   border-radius: 10px;
   background: var(--surface-bg);
 }
@@ -569,7 +579,7 @@ select option {
 .tab-button.active {
   border-bottom-color: var(--accent-neon);
   color: var(--accent-neon);
-  box-shadow: 0 2px 10px rgba(0, 255, 255, 0.3);
+  box-shadow: 0 2px 10px rgba(215, 188, 120, 0.3);
 }
 
 .tab-panel {
@@ -629,7 +639,7 @@ select option {
 .log {
   min-height: 220px;
   padding: 14px;
-  border: 1px solid rgba(0, 255, 255, 0.35);
+  border: 1px solid rgba(215, 188, 120, 0.35);
   border-radius: 10px;
   background: var(--battle-bg);
   color: var(--text-primary);
@@ -645,7 +655,7 @@ select option {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 4px;
-  border-bottom: 1px solid rgba(168, 85, 247, 0.16);
+  border-bottom: 1px solid rgba(194, 159, 84, 0.16);
 }
 
 .item-row:last-child,
@@ -670,8 +680,8 @@ select option {
 #inventoryContent .item-row:hover {
   padding-right: 10px;
   padding-left: 10px;
-  background: rgba(168, 85, 247, 0.08);
-  box-shadow: 0 0 14px rgba(168, 85, 247, 0.15);
+  background: rgba(194, 159, 84, 0.08);
+  box-shadow: 0 0 14px rgba(194, 159, 84, 0.15);
 }
 
 .inventory-equipment-icon {
@@ -708,7 +718,7 @@ select option {
   border-radius: 12px;
   background:
     linear-gradient(var(--panel-bg), var(--panel-bg)) padding-box,
-    linear-gradient(135deg, var(--primary-color), rgba(0, 255, 255, 0.5)) border-box;
+    linear-gradient(135deg, var(--primary-color), rgba(215, 188, 120, 0.5)) border-box;
 }
 
 .equipment-slot:hover {
@@ -811,7 +821,7 @@ select option {
 }
 
 .equipment-inventory-btn {
-  background: rgba(124, 58, 237, 0.25);
+  background: rgba(194, 159, 84, 0.25);
   box-shadow: none;
 }
 
@@ -831,7 +841,7 @@ select option {
 
 .equipment-total {
   margin-top: 16px;
-  background: rgba(124, 58, 237, 0.12);
+  background: rgba(194, 159, 84, 0.12);
 }
 
 .hidden {
@@ -1252,12 +1262,12 @@ select option {
 }
 
 .inventory-item-row {
-  border-color: #00ffff;
+  border-color: #d7bc78;
 }
 
 .inventory-equip-button,
 .potion-use-button {
-  background: #7c3aed;
+  background: #c8a45a;
 }
 
 .inventory-empty {
@@ -1290,7 +1300,7 @@ select option {
 .potions-section {
   margin-top: 20px;
   padding: 16px;
-  border: 1px solid #7c3aed;
+  border: 1px solid #c8a45a;
   border-radius: 12px;
 }
 
@@ -1309,7 +1319,7 @@ select option {
   align-items: center;
   gap: 12px;
   padding: 10px;
-  border: 1px solid #00ffff;
+  border: 1px solid #d7bc78;
   border-radius: 10px;
   background: var(--surface-bg);
 }
@@ -1377,7 +1387,7 @@ select option {
   background:
     linear-gradient(var(--panel-bg), var(--panel-bg)) padding-box,
     linear-gradient(135deg, var(--primary-color), var(--accent-neon)) border-box;
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+  box-shadow: 0 0 15px rgba(215, 188, 120, 0.2);
   padding: 20px;
 }
 
@@ -1462,7 +1472,7 @@ a.secondary-btn {
 
 .enemy-card.selected {
   border-color: var(--accent-neon);
-  box-shadow: 0 0 20px var(--neon-glow), inset 0 0 20px rgba(0, 255, 255, 0.04);
+  box-shadow: 0 0 20px var(--neon-glow), inset 0 0 20px rgba(215, 188, 120, 0.04);
 }
 
 .enemy-card.selected::before {
@@ -1508,7 +1518,7 @@ a.secondary-btn {
   border-radius: 10px;
   background: var(--battle-bg);
   color: var(--text-primary);
-  box-shadow: 0 0 16px rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 16px rgba(215, 188, 120, 0.1);
 }
 
 .battle-log .log-line {
@@ -1591,10 +1601,10 @@ a.secondary-btn {
 
 .daily-quest-card {
   padding: 18px;
-  border: 1px solid rgba(168, 85, 247, 0.45);
+  border: 1px solid rgba(194, 159, 84, 0.45);
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(10, 10, 26, 0.92));
-  box-shadow: 0 0 18px rgba(124, 58, 237, 0.12);
+  background: linear-gradient(135deg, rgba(194, 159, 84, 0.2), rgba(16, 17, 17, 0.92));
+  box-shadow: 0 0 18px rgba(194, 159, 84, 0.12);
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 
@@ -1655,13 +1665,13 @@ a.secondary-btn {
   justify-content: space-between;
   gap: 12px;
   padding: 8px 18px;
-  border-bottom: 1px solid rgba(194, 159, 84, 0.28);
+  border-bottom: 1px solid var(--city-border);
   background: rgba(15, 16, 16, 0.96);
   backdrop-filter: blur(12px);
 }
 
 .hub-brand {
-  color: #c8a45a;
+  color: var(--city-gold);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -1704,7 +1714,7 @@ a.secondary-btn {
 
 .hub-intro h1 {
   margin: 5px 0 14px;
-  color: #e2c77e;
+  color: var(--city-gold-light);
   font-family: 'Roboto', sans-serif;
   font-size: clamp(1.55rem, 6vw, 2rem);
   letter-spacing: 0.03em;
@@ -1771,21 +1781,21 @@ a.secondary-btn {
 }
 
 .hub-events strong {
-  color: #85cbb5;
+  color: var(--city-teal);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
 
 .hub-notice {
   min-height: 0;
-  color: #85cbb5;
+  color: var(--city-teal);
   font-size: 0.85rem;
 }
 
 .hub-notice:not(:empty) {
   margin: 8px 20px 0;
   padding: 8px 10px;
-  border-left: 2px solid #85cbb5;
+  border-left: 2px solid var(--city-teal);
   background: rgba(133, 203, 181, 0.07);
 }
 
@@ -1804,7 +1814,7 @@ a.secondary-btn {
 }
 
 .hub-menu {
-  border-top: 1px solid rgba(213, 215, 210, 0.12);
+  border-top: 1px solid var(--city-divider);
 }
 
 .hub-menu button,
@@ -1816,11 +1826,11 @@ a.secondary-btn {
   gap: 7px;
   padding: 10px 8px;
   border: 0;
-  border-bottom: 1px solid rgba(213, 215, 210, 0.12);
+  border-bottom: 1px solid var(--city-divider);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  color: #d7bc78;
+  color: var(--city-gold-text);
   font-size: 0.95rem;
   font-weight: 500;
   text-align: left;
@@ -1853,7 +1863,7 @@ a.secondary-btn {
   transform: none;
   background: rgba(215, 188, 120, 0.08);
   color: #f1d997;
-  box-shadow: inset 3px 0 #c8a45a;
+  box-shadow: inset 3px 0 var(--city-gold);
 }
 
 .hub-menu button:active,
@@ -1864,7 +1874,7 @@ a.secondary-btn {
 .hub-navigation {
   margin-top: 10px;
   padding: 0 20px 16px;
-  border-top: 1px solid rgba(194, 159, 84, 0.28);
+  border-top: 1px solid var(--city-border);
 }
 
 .hub-navigation button {
@@ -1890,7 +1900,7 @@ a.secondary-btn {
 .daily-quest-progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #7c3aed, #a855f7 55%, #00ffff);
+  background: linear-gradient(90deg, #c8a45a, #d7bc78 55%, #d7bc78);
   box-shadow: 0 0 12px var(--neon-glow);
   transition: width 0.4s ease;
 }
@@ -1945,12 +1955,12 @@ a.secondary-btn {
   border-radius: 8px;
   color: var(--accent-neon);
   text-decoration: none;
-  box-shadow: 0 0 12px rgba(0, 255, 255, 0.15);
+  box-shadow: 0 0 12px rgba(215, 188, 120, 0.15);
 }
 
 .btn-nav:hover {
   color: #fff;
-  background: rgba(0, 255, 255, 0.12);
+  background: rgba(215, 188, 120, 0.12);
   box-shadow: 0 0 22px var(--neon-glow);
 }
 
@@ -1966,8 +1976,8 @@ a.secondary-btn {
 }
 
 @keyframes glow {
-  0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 255, 0.3); }
-  50% { box-shadow: 0 0 30px rgba(168, 85, 247, 0.8); }
+  0%, 100% { box-shadow: 0 0 10px rgba(215, 188, 120, 0.3); }
+  50% { box-shadow: 0 0 30px rgba(194, 159, 84, 0.8); }
 }
 
 @keyframes levelUpFlash {
@@ -2269,12 +2279,13 @@ a.secondary-btn {
 .hp-bar {
   position: relative;
   z-index: 2;
-  margin: 14px auto 0;
-  padding: 6px 12px;
-  max-width: 960px;
-  border-bottom: 1px solid rgba(191, 155, 91, 0.28);
-  background: #1b1a18;
-  color: #e8998d;
+  width: min(100%, 720px);
+  margin: 10px auto 0;
+  padding: 8px 18px;
+  border: 1px solid var(--city-border);
+  background: rgba(15, 16, 16, 0.96);
+  color: var(--city-gold-text);
+  font-size: 0.85rem;
   font-weight: 700;
-  text-align: center;
+  text-align: right;
 }
