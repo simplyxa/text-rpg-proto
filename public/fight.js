@@ -25,6 +25,7 @@ function loadHero() {
 function saveCharacter(character) {
   const current = loadHero() || {};
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...character }));
+  window.updateExperienceBar?.(character.xp, character.xpToNext, character.level);
 }
 
 function escapeHtml(value) {
