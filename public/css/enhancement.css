@@ -1,0 +1,104 @@
+.enhancement-page {
+  width: min(100%, 1100px);
+}
+
+.gold-display {
+  color: #ffd700;
+  font-weight: 700;
+}
+
+.enhancement-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 18px;
+  margin: 20px 0;
+}
+
+.enhancement-card {
+  padding: 18px;
+  border: 1px solid var(--primary-color);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1e1e2e, #2d2d44);
+}
+
+.enhancement-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.item-details {
+  flex: 1;
+}
+
+.item-details h2 {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+}
+
+.item-details .enhancement-level {
+  margin-left: 8px;
+  color: var(--accent-neon);
+}
+
+.enhancement-stat {
+  margin: 5px 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.enhancement-info {
+  margin: 16px 0 12px;
+  padding: 12px;
+  border: 1px solid var(--accent-neon);
+  border-radius: 8px;
+  background: rgba(0, 255, 255, 0.06);
+}
+
+.enhancement-info p {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px 0 10px;
+  color: var(--text-secondary);
+}
+
+.enhancement-progress {
+  position: relative;
+  height: 24px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #333;
+}
+
+.enhancement-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color), var(--accent-neon));
+  transition: width 0.3s ease;
+}
+
+.enhancement-progress strong {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 0.8rem;
+}
+
+.btn-enhance {
+  width: 100%;
+}
+
+.enhancement-unavailable {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enhancement-progress span {
+    transition: none;
+  }
+}

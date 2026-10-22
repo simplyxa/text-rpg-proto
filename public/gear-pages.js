@@ -77,6 +77,11 @@ function itemArmor(item) {
   return shopItem?.armor ?? slotArmor[item?.slot] ?? 0;
 }
 
+function enhancedStat(value, enhancement) {
+  const level = Math.min(10, Math.max(0, Math.floor(Number(enhancement) || 0)));
+  return (Number(value) || 0) * (1 + level * 0.1);
+}
+
 function createGearRow(name, rarity, details = '', item = null) {
   const row = document.createElement('article');
   row.className = 'gear-row';
@@ -120,12 +125,16 @@ function renderEquipmentPage() {
       const itemName = document.createElement('strong');
       itemName.className = `rarity-${item.rarity || 'common'}`;
       itemName.textContent = item.name;
+      const enhancement = Math.min(10, Math.max(0, Math.floor(Number(item.enhancement) || 0)));
+      const enhancementLabel = document.createElement('span');
+      enhancementLabel.className = `enhancement-level${enhancement >= 5 ? ' enhancement-high' : ''}`;
+      enhancementLabel.textContent = `+${enhancement}`;
       const rarity = document.createElement('span');
       rarity.textContent = rarityName(item.rarity);
       const armor = document.createElement('span');
       armor.className = 'armor-bonus';
-      armor.textContent = `Защита: +${itemArmor(item)}`;
-      itemDetails.append(itemName, rarity, armor);
+      armor.textContent = `Защита: +${enhancedStat(itemArmor(item), enhancement).toFixed(1).replace(/\.0$/, '')}`;
+      itemDetails.append(itemName, enhancementLabel, rarity, armor);
       row.append(itemDetails);
 
       const button = document.createElement('button');
