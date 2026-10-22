@@ -96,7 +96,7 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
         <div><dt>Энергия</dt><dd>${energy}/${Number(character.maxMana) || 100}</dd></div>
         <div><dt>Регенерация</dt><dd>+1</dd></div>
         <div><dt>Броня</dt><dd>${armor}</dd></div>
-        <div class="profile-total"><dt>Сумма</dt><dd>${strength + health + energy + armor}</dd></div>
+        <div class="profile-total"><dt>Сумма</dt><dd>${Math.round(strength + health + energy + armor)}</dd></div>
       </dl>
     </section>
 
@@ -118,7 +118,6 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
       </div>
       <dl class="profile-rows profile-details">
         <div><dt>Деньги</dt><dd>${Number(character.gold) || 0} золота</dd></div>
-        <div><dt>Ресурсы</dt><dd>12 дерева · 4 руды</dd></div>
         <div><dt>Профессия</dt><dd>Не выбрана</dd></div>
         <div><dt>Участие</dt><dd>—</dd></div>
         <div class="profile-experience">
@@ -132,10 +131,17 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
         <div><dt>Рейтинг арены</dt><dd>0</dd></div>
         <div><dt>Рейтинг турнира</dt><dd>—</dd></div>
       </dl>
-      <a class="profile-statistics-link" href="#" data-profile-placeholder="Статистика героя">Статистика героя <span>›</span></a>
+      <a class="profile-statistics-link" href="/hero-stats">Статистика героя <span>›</span></a>
     </section>
 
-    <section class="profile-section profile-extra" aria-label="Снаряжение и зелья">
+    <section class="profile-section" id="profileResources" aria-labelledby="resourcesHeading">
+      <h2 id="resourcesHeading">Ресурсы</h2>
+      <dl class="profile-rows profile-details">
+        <div><dt>Ресурсы</dt><dd>12 дерева · 4 руды</dd></div>
+      </dl>
+    </section>
+
+    <section class="profile-section profile-extra" aria-label="Дополнительные характеристики">
       <div class="profile-current-stats">
         <span>Ловкость <strong>${Number(character.agi) || 0}</strong></span>
         <span>Интеллект <strong>${Number(character.int) || 0}</strong></span>
@@ -144,31 +150,7 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
     </section>
   `;
 
-  characterCard.append(renderPotions(character));
-  const equipmentSection = document.createElement('section');
-  equipmentSection.className = 'character-equipment';
-  const equipmentHeading = document.createElement('h2');
-  equipmentHeading.textContent = 'Снаряжение';
-  equipmentSection.append(equipmentHeading);
-  const equippedItems = Object.values(character.equipment || {}).filter(Boolean);
-  if (equippedItems.length) {
-    const icons = document.createElement('div');
-    icons.className = 'equipped-icons';
-    equippedItems.forEach((item) => {
-      const equippedItem = document.createElement('span');
-      equippedItem.className = 'equipped-item-label';
-      const icon = createItemIcon(item, 'equipment');
-      if (icon) equippedItem.append(icon);
-      const label = document.createElement('span');
-      const enhancement = Math.min(10, Math.max(0, Math.floor(Number(item.enhancement) || 0)));
-      label.textContent = `${item.name} +${enhancement}`;
-      if (enhancement >= 5) label.classList.add('enhancement-high');
-      equippedItem.append(label);
-      icons.append(equippedItem);
-    });
-    equipmentSection.append(icons);
-  }
-  characterCard.append(equipmentSection);
+  characterCard.querySelector('#profileResources').append(renderPotions(character));
 
   document.querySelectorAll('[data-profile-placeholder]').forEach((link) => {
     link.onclick = (event) => {

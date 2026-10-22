@@ -1146,6 +1146,7 @@ const PAGES = {
   '/forest': 'forest.html',
   '/cave': 'cave.html',
   '/character': 'character.html',
+  '/hero-stats': 'hero-stats.html',
   '/quests': 'quests.html',
   '/fight': 'fight.html',
   '/inventory': 'inventory.html',
