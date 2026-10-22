@@ -3,7 +3,7 @@
   flex: 0 0 auto;
   object-fit: contain;
   vertical-align: middle;
-  filter: drop-shadow(0 0 4px rgba(124, 58, 237, 0.7));
+  filter: drop-shadow(0 0 4px rgba(194, 159, 84, 0.7));
   transition: transform 0.2s ease, filter 0.2s ease;
 }
 
@@ -14,7 +14,7 @@
 .item-icon:hover,
 .gear-row:hover .item-icon {
   transform: scale(1.1);
-  filter: drop-shadow(0 0 8px #00ffff);
+  filter: drop-shadow(0 0 8px #d7bc78);
 }
 
 .item-icon-new { animation: item-icon-pulse 1.5s ease-in-out infinite; }
@@ -30,8 +30,8 @@
 }
 
 @keyframes item-icon-glow {
-  0%, 100% { filter: drop-shadow(0 0 3px #7c3aed); }
-  50% { filter: drop-shadow(0 0 10px #00ffff); }
+  0%, 100% { filter: drop-shadow(0 0 3px #c8a45a); }
+  50% { filter: drop-shadow(0 0 10px #d7bc78); }
 }
 
 @keyframes item-icon-spin {
@@ -58,7 +58,7 @@
 
 .enhancement-level,
 .enhancement-high {
-  color: #00ffff;
+  color: #d7bc78;
   font-weight: 700;
 }
 
