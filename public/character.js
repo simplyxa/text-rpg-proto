@@ -34,11 +34,18 @@ function renderCharacterPage() {
     return;
   }
 
+  const armor = Number.isFinite(Number(character.armor))
+    ? Number(character.armor)
+    : Object.values(character.equipment || {}).reduce(
+      (total, item) => total + (Number(item?.statBonus?.armor) || 0),
+      0
+    );
   title.textContent = character.name;
   characterCard.innerHTML = `
     <p><strong>Класс:</strong> ${character.classId}</p>
     <p><strong>Уровень:</strong> ${character.level}</p>
     <p><strong>HP:</strong> ${character.hp}/${character.maxHp}</p>
+    <p class="armor-stat"><strong>Защита:</strong> ${armor}</p>
     <p><strong>Сила:</strong> ${character.str}</p>
     <p><strong>Ловкость:</strong> ${character.agi}</p>
     <p><strong>Интеллект:</strong> ${character.int}</p>

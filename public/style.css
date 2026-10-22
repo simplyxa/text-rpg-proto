@@ -601,6 +601,16 @@ select option {
   overflow-wrap: anywhere;
 }
 
+.armor-stat {
+  color: #3b82f6;
+  font-family: monospace;
+}
+
+.armor-bonus {
+  color: #10b981 !important;
+  font-family: monospace;
+}
+
 #profileContent {
   transition: background 0.3s ease, border-color 0.3s ease;
 }

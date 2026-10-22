@@ -37,17 +37,27 @@ const EQUIPMENT_DROP_TEMPLATES = [
 ];
 
 const SHOP_EQUIPMENT = [
-  { id: 'helmet', name: 'Шлем', slot: 'helmet', statBonus: { maxHp: 2 } },
-  { id: 'amulet', name: 'Амулет', slot: 'ring', statBonus: { int: 1 } },
-  { id: 'armor', name: 'Броня', slot: 'chest', statBonus: { str: 1 } },
-  { id: 'gloves', name: 'Перчатки', slot: 'hands', statBonus: { agi: 1 } },
-  { id: 'pants', name: 'Штаны', slot: 'armor', statBonus: { maxHp: 1 } },
-  { id: 'boots', name: 'Сапоги', slot: 'boots', statBonus: { agi: 1 } },
-  { id: 'left_blade', name: 'Левый клинок', slot: 'shield', statBonus: { str: 1 } },
-  { id: 'right_blade', name: 'Правый клинок', slot: 'cloak', statBonus: { str: 1 } }
+  { id: 'helmet', name: 'Шлем', slot: 'helmet', statBonus: { maxHp: 2, armor: 2 } },
+  { id: 'amulet', name: 'Амулет', slot: 'ring', statBonus: { int: 1, armor: 1 } },
+  { id: 'armor', name: 'Броня', slot: 'chest', statBonus: { str: 1, armor: 5 } },
+  { id: 'gloves', name: 'Перчатки', slot: 'hands', statBonus: { agi: 1, armor: 1 } },
+  { id: 'pants', name: 'Штаны', slot: 'armor', statBonus: { maxHp: 1, armor: 2 } },
+  { id: 'boots', name: 'Сапоги', slot: 'boots', statBonus: { agi: 1, armor: 1 } },
+  { id: 'left_blade', name: 'Левый клинок', slot: 'shield', statBonus: { str: 1, armor: 0 } },
+  { id: 'right_blade', name: 'Правый клинок', slot: 'cloak', statBonus: { str: 1, armor: 3 } }
 ];
 const SHOP_ITEM_PRICE = 1500;
 const SHOP_SET_PRICE = 10000;
+const LEGACY_SLOT_ARMOR = {
+  helmet: 2,
+  ring: 1,
+  chest: 5,
+  hands: 1,
+  armor: 2,
+  boots: 1,
+  shield: 3,
+  cloak: 0
+};
 
 function createEquipmentItem(id, name, slot, rarity, statBonus) {
   return {
@@ -55,7 +65,7 @@ function createEquipmentItem(id, name, slot, rarity, statBonus) {
     name,
     slot,
     rarity,
-    statBonus: { str: 0, agi: 0, int: 0, maxHp: 0, ...statBonus },
+    statBonus: { str: 0, agi: 0, int: 0, maxHp: 0, armor: 0, ...statBonus },
     icon: `/equipment-icons.svg#${slot}`
   };
 }
@@ -83,13 +93,19 @@ function createEquipmentInventory() {
 }
 
 function getEquipmentBonuses(equipment = {}) {
-  const bonuses = { str: 0, agi: 0, int: 0, maxHp: 0 };
+  const bonuses = { str: 0, agi: 0, int: 0, maxHp: 0, armor: 0 };
   for (const slot of EQUIPMENT_SLOTS) {
     const item = equipment[slot];
     if (!item || !item.statBonus) continue;
-    for (const stat of Object.keys(bonuses)) {
+    for (const stat of Object.keys(bonuses).filter((key) => key !== 'armor')) {
       bonuses[stat] += Number(item.statBonus[stat]) || 0;
     }
+    const shopItem = SHOP_EQUIPMENT.find((template) =>
+      item.name === template.name || item.id === template.id || item.id?.startsWith(`${template.id}_`)
+    );
+    bonuses.armor += Object.hasOwn(item.statBonus, 'armor')
+      ? Number(item.statBonus.armor) || 0
+      : shopItem?.statBonus.armor ?? LEGACY_SLOT_ARMOR[slot] ?? 0;
   }
   return bonuses;
 }
@@ -103,6 +119,7 @@ function withEquipmentBonuses(character) {
     str: character.str + bonuses.str,
     agi: character.agi + bonuses.agi,
     int: character.int + bonuses.int,
+    armor: bonuses.armor,
     maxHp,
     hp: Math.min(character.hp, maxHp),
     equipmentBonuses: bonuses
@@ -116,7 +133,7 @@ function randInt(min, max) {
 function createEquipmentDrop(rarity) {
   const template = EQUIPMENT_DROP_TEMPLATES[randInt(0, EQUIPMENT_DROP_TEMPLATES.length - 1)];
   const stats = ['str', 'agi', 'int', 'maxHp'];
-  const statBonus = { str: 0, agi: 0, int: 0, maxHp: 0 };
+  const statBonus = { str: 0, agi: 0, int: 0, maxHp: 0, armor: LEGACY_SLOT_ARMOR[template.slot] || 0 };
   const bonusCount = randInt(1, 2);
 
   for (let i = 0; i < bonusCount; i += 1) {
@@ -849,6 +866,13 @@ function createBoss(level) {
   };
 }
 
+function calculateDamageAfterArmor(baseDamage, armor) {
+  const percentReduction = Math.pow(armor / 200, 2) * 100;
+  const fixedReduction = Math.floor(armor / 3);
+  const finalDamage = Math.max(1, baseDamage * (1 - percentReduction / 100) - fixedReduction);
+  return Math.round(finalDamage);
+}
+
 function describeBonuses(item) {
   return Object.entries(item.statBonus).filter(([, v]) => v > 0).map(([k, v]) => `${k} +${v}`).join(', ');
 }
@@ -967,9 +991,11 @@ app.post('/api/fight/attack', async (req, res) => {
   }
 
   for (const enemy of session.enemies.filter((e) => e.hp > 0)) {
-    const hit = Math.max(1, enemy.atk + randInt(0, 3) - Math.floor((char.agi + bonuses.agi) / 3));
+    const baseDamage = enemy.atk + randInt(0, 3) - Math.floor((char.agi + bonuses.agi) / 3);
+    const hit = calculateDamageAfterArmor(baseDamage, bonuses.armor);
     char.hp = Math.max(0, char.hp - hit);
-    log.push(`${enemy.name} атаковал вас на ${hit} урона`);
+    const prevented = Math.max(0, baseDamage - hit);
+    log.push(`${enemy.name} атаковал вас на ${hit} урона${bonuses.armor ? ` (защита: ${bonuses.armor}, снижено на ${prevented})` : ''}`);
     if (char.hp <= 0) break;
   }
 
