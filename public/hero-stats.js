@@ -30,6 +30,12 @@ function renderHeroStats() {
     ['Здоровье', `${num(hero.hp)} / ${num(hero.maxHp) || num(hero.hp)}`],
     ['Энергия', `${num(hero.mana)} / ${num(hero.maxMana) || 100}`],
     ['Броня', num(hero.armor)],
+    ['Критический удар', `${Math.round((Number(hero.critChance) || 0) * 100)}%`],
+    ['Уклонение', `${Math.round((Number(hero.dodgeChance) || 0) * 100)}%`],
+    ['Блок', `${Math.round((Number(hero.blockChance) || 0) * 100)}%`],
+    ['Сопротивление физическому урону', `${num(hero.resistances?.physical)}%`],
+    ['Сопротивление магии', `${num(hero.resistances?.magic)}%`],
+    ['Сопротивление яду', `${num(hero.resistances?.poison)}%`],
     ['Золото', num(hero.gold)],
     ['Победы', num(hero.kills)]
   ];

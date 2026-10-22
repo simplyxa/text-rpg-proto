@@ -105,7 +105,7 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
       <div class="profile-rows profile-bonuses">
         <div><span>Алтарь</span><strong>+5% к опыту</strong><small>ещё 2 дн.</small></div>
         <div><span>Мастер</span><strong>+2 к силе</strong><small>постоянно</small></div>
-        <div><span>Таланты</span><strong>+3 к здоровью</strong><small>постоянно</small></div>
+        <div><span>Таланты</span><strong>${Object.values(character.talents || {}).reduce((total, rank) => total + (Number(rank) || 0), 0)} рангов</strong><small>${Number(character.talentPoints) || 0} очков</small></div>
         <div><span>Набор героя</span><strong>+1 к броне</strong><small>активен</small></div>
       </div>
     </section>

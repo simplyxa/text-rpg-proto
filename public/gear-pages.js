@@ -23,6 +23,7 @@ const SHOP_ITEMS = [
 
 let characterId;
 let character;
+let shopCatalog = [];
 
 function saveCharacter(nextCharacter) {
   character = nextCharacter;
@@ -80,6 +81,26 @@ function itemArmor(item) {
 function enhancedStat(value, enhancement) {
   const level = Math.min(10, Math.max(0, Math.floor(Number(enhancement) || 0)));
   return (Number(value) || 0) * (1 + level * 0.1);
+}
+
+function itemStatDetails(item) {
+  const labels = {
+    str: 'Сила',
+    agi: 'Ловкость',
+    int: 'Интеллект',
+    maxHp: 'Здоровье',
+    armor: 'Защита',
+    attack: 'Атака',
+    defense: 'Снижение урона',
+    healthRegen: 'Регенерация'
+  };
+  const details = Object.entries(labels)
+    .filter(([stat]) => Number(item.statBonus?.[stat]) > 0)
+    .map(([stat, label]) => `${label} +${item.statBonus[stat]}`);
+  Object.entries(item.statBonus?.resistances || {}).forEach(([type, value]) => {
+    if (Number(value) > 0) details.push(`Сопротивление ${type} +${value}%`);
+  });
+  return details.join(' • ') || 'Без бонусов';
 }
 
 function createGearRow(name, rarity, details = '', item = null) {
@@ -194,7 +215,7 @@ async function renderInventory() {
   }
 
   items.forEach((item) => {
-    const details = `Защита: +${itemArmor(item)} • Урон: +${Number(item.statBonus?.str) || 0}`;
+    const details = itemStatDetails(item);
     const row = createGearRow(item.name, item.rarity, details, item);
     row.classList.add('inventory-item-row');
     const button = document.createElement('button');
@@ -240,25 +261,51 @@ async function equipItemFromInventory(itemId) {
 
 async function loadShopPage() {
   if (!await loadCharacter()) return;
+  document.getElementById('buySetButton').addEventListener('click', buyEquipmentSet);
+  await renderShopPage();
+}
+
+async function renderShopPage() {
+  const result = await requestJson(`/api/shop?id=${encodeURIComponent(characterId)}`);
+  shopCatalog = result.items;
   document.getElementById('gold').textContent = character.gold;
   const container = document.getElementById('shopItems');
   container.replaceChildren();
-  SHOP_ITEMS.forEach((item) => {
-    const row = createGearRow(item.name, 'common', `Защита: +${item.armor} • 1500 золота`, item);
+  shopCatalog.forEach((item) => {
+    const row = createGearRow(item.name, item.rarity, `${itemStatDetails(item)} • ${item.price} золота`, item);
     const button = document.createElement('button');
     button.className = 'small-btn';
     button.type = 'button';
     button.textContent = 'Купить';
-    button.addEventListener('click', () => buyItem(item.name, 1500));
+    button.addEventListener('click', () => buyItem(item.id));
     row.append(button);
     container.append(row);
   });
   renderShopWithIcons(container);
-  document.getElementById('buySetButton').addEventListener('click', buyEquipmentSet);
+  const playerItems = document.getElementById('playerItems');
+  playerItems.replaceChildren();
+  if (!result.inventory.length) {
+    const empty = document.createElement('p');
+    empty.className = 'inventory-empty';
+    empty.textContent = 'Нет предметов для продажи.';
+    playerItems.append(empty);
+    return;
+  }
+  result.inventory.forEach((item) => {
+    const row = createGearRow(item.name, item.rarity, `${itemStatDetails(item)} • Продажа: ${item.sellPrice} золота`, item);
+    const button = document.createElement('button');
+    button.className = 'small-btn';
+    button.type = 'button';
+    button.textContent = 'Продать';
+    button.addEventListener('click', () => sellItem(item.id));
+    row.append(button);
+    playerItems.append(row);
+  });
+  renderShopWithIcons(playerItems);
 }
 
-async function buyItem(itemName, price) {
-  const item = SHOP_ITEMS.find((candidate) => candidate.name === itemName);
+async function buyItem(itemId) {
+  const item = shopCatalog.find((candidate) => candidate.id === itemId);
   if (!item) {
     showMessage('Неизвестный предмет.');
     return;
@@ -268,10 +315,25 @@ async function buyItem(itemName, price) {
     const result = await requestJson('/api/buyEquipment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: characterId, itemId: item.id, price })
+      body: JSON.stringify({ id: characterId, itemId: item.id })
     });
     saveCharacter(result.character);
-    document.getElementById('gold').textContent = character.gold;
+    await renderShopPage();
+    showMessage(result.message);
+  } catch (error) {
+    showMessage(error.message);
+  }
+}
+
+async function sellItem(itemId) {
+  try {
+    const result = await requestJson('/api/sellItem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: characterId, itemId })
+    });
+    saveCharacter(result.character);
+    await renderShopPage();
     showMessage(result.message);
   } catch (error) {
     showMessage(error.message);
@@ -286,7 +348,7 @@ async function buyEquipmentSet() {
       body: JSON.stringify({ id: characterId })
     });
     saveCharacter(result.character);
-    document.getElementById('gold').textContent = character.gold;
+    await renderShopPage();
     showMessage(result.message);
   } catch (error) {
     showMessage(error.message);

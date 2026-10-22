@@ -4,6 +4,18 @@ const path = require('path');
 const cors = require('cors');
 const crypto = require('crypto');
 const { Pool } = require('pg');
+const {
+  DAMAGE_TYPES,
+  TALENT_TREES,
+  creditGold,
+  getSalePrice,
+  getTalentBonuses,
+  normalizeGold,
+  normalizeResistances,
+  resolveCombatHit,
+  spendGold,
+  upgradeTalent
+} = require('./game-systems');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -28,7 +40,7 @@ const MONSTERS = {
   goblin: { id: 'goblin', name: 'Гоблин', hp: 14, atk: 4, def: 1, xp: 10, gold: 7 },
   wolf: { id: 'wolf', name: 'Волк', hp: 18, atk: 5, def: 1, xp: 15, gold: 10 },
   bandit: { id: 'bandit', name: 'Бандит', hp: 24, atk: 7, def: 2, xp: 18, gold: 18, rarity: 'rare' },
-  slime: { id: 'slime', name: 'Слизь', hp: 16, atk: 4, def: 1, xp: 12, gold: 9 }
+  slime: { id: 'slime', name: 'Слизь', hp: 16, atk: 4, def: 1, xp: 12, gold: 9, damageType: 'magic' }
 };
 
 const EQUIPMENT_DROP_TEMPLATES = [
@@ -40,6 +52,15 @@ const EQUIPMENT_DROP_TEMPLATES = [
   { slot: 'boots', name: 'Ботинки' },
   { slot: 'cloak', name: 'Плащ' },
   { slot: 'ring', name: 'Кольцо' }
+];
+
+const ITEM_PREFIXES = [
+  { name: 'Крепкий', statBonus: { maxHp: 3 } },
+  { name: 'Отточенный', statBonus: { attack: 1 } }
+];
+const ITEM_SUFFIXES = [
+  { name: 'стойкости', statBonus: { defense: 1 } },
+  { name: 'восстановления', statBonus: { healthRegen: 1 } }
 ];
 
 const SHOP_EQUIPMENT = [
@@ -67,14 +88,26 @@ const LEGACY_SLOT_ARMOR = {
   cloak: 0
 };
 
-function createEquipmentItem(id, name, slot, rarity, statBonus) {
+function createEquipmentItem(id, name, slot, rarity, statBonus = {}) {
+  const safeRarity = ['common', 'rare', 'epic', 'legendary'].includes(rarity) ? rarity : 'common';
   return {
     id,
     name,
     slot,
-    rarity,
+    rarity: safeRarity,
     enhancement: 0,
-    statBonus: { str: 0, agi: 0, int: 0, maxHp: 0, armor: 0, ...statBonus },
+    statBonus: {
+      str: 0,
+      agi: 0,
+      int: 0,
+      maxHp: 0,
+      armor: 0,
+      attack: 0,
+      defense: 0,
+      healthRegen: 0,
+      ...statBonus,
+      resistances: { physical: 0, magic: 0, poison: 0, ...statBonus.resistances }
+    },
     icon: `/equipment-icons.svg#${slot}`
   };
 }
@@ -110,21 +143,35 @@ function createEquipmentInventory() {
 }
 
 function getEquipmentBonuses(equipment = {}) {
-  const bonuses = { str: 0, agi: 0, int: 0, maxHp: 0, armor: 0 };
+  const bonuses = {
+    str: 0,
+    agi: 0,
+    int: 0,
+    maxHp: 0,
+    armor: 0,
+    attack: 0,
+    defense: 0,
+    healthRegen: 0,
+    resistances: { physical: 0, magic: 0, poison: 0 }
+  };
   for (const slot of EQUIPMENT_SLOTS) {
     const item = equipment[slot];
-    if (!item || !item.statBonus) continue;
-    for (const stat of Object.keys(bonuses).filter((key) => key !== 'armor' && key !== 'str')) {
-      bonuses[stat] += Number(item.statBonus[stat]) || 0;
+    if (!item) continue;
+    const stats = item.statBonus || {};
+    for (const stat of ['agi', 'int', 'maxHp', 'attack', 'defense', 'healthRegen']) {
+      bonuses[stat] += Number(stats[stat]) || 0;
     }
-    bonuses.str += getEnhancedStat(item.statBonus.str, item.enhancement);
+    bonuses.str += getEnhancedStat(stats.str, item.enhancement);
     const shopItem = SHOP_EQUIPMENT.find((template) =>
       item.name === template.name || item.id === template.id || item.id?.startsWith(`${template.id}_`)
     );
-    const baseArmor = Object.hasOwn(item.statBonus, 'armor')
-      ? Number(item.statBonus.armor) || 0
+    const baseArmor = Object.hasOwn(stats, 'armor')
+      ? Number(stats.armor) || 0
       : shopItem?.statBonus.armor ?? LEGACY_SLOT_ARMOR[slot] ?? 0;
     bonuses.armor += getEnhancedStat(baseArmor, item.enhancement);
+    for (const type of DAMAGE_TYPES) {
+      bonuses.resistances[type] += Number(stats.resistances?.[type]) || 0;
+    }
   }
   return bonuses;
 }
@@ -133,13 +180,26 @@ function withEquipmentBonuses(character) {
   if (!character) return character;
   const bonuses = getEquipmentBonuses(character.equipment);
   const potionBonuses = getActivePotionBonuses(character);
+  const talents = getTalentBonuses(character.talents);
   const maxHp = character.maxHp + bonuses.maxHp;
+  const resistances = normalizeResistances(Object.fromEntries(DAMAGE_TYPES.map((type) => [
+    type,
+    (Number(character.resistances?.[type]) || 0) + bonuses.resistances[type] + talents.resistances[type]
+  ])));
   return {
     ...character,
-    str: character.str + bonuses.str + potionBonuses.str,
+    str: character.str + bonuses.str + potionBonuses.str + talents.attack,
     agi: character.agi + bonuses.agi,
     int: character.int + bonuses.int,
     armor: bonuses.armor + potionBonuses.armor,
+    attack: bonuses.attack + talents.attack,
+    defense: bonuses.defense,
+    healthRegen: bonuses.healthRegen + talents.healthRegen,
+    critChance: 0.1 + talents.critChance,
+    dodgeChance: 0.05 + talents.dodgeChance,
+    blockChance: 0.1 + talents.blockChance,
+    resistances,
+    talentBonuses: talents,
     maxHp,
     hp: Math.min(character.hp, maxHp),
     equipmentBonuses: bonuses
@@ -161,6 +221,9 @@ function sanitizeInventory(inventory = []) {
     .filter((item) => item?.id !== 'food' && item?.name !== 'Пирожок')
     .map((item) => item?.id === 'potion'
       ? { ...item, id: 'potion_health', name: POTIONS.potion_health.name, heal: 50 }
+      : item)
+    .map((item) => item?.slot
+      ? { ...item, rarity: ['common', 'rare', 'epic', 'legendary'].includes(item.rarity) ? item.rarity : 'common' }
       : item);
 }
 
@@ -187,9 +250,18 @@ function createEquipmentDrop(rarity) {
     statBonus[stat] = rarity === 'rare' ? randInt(2, 4) : randInt(1, 2);
   }
 
+  const prefix = ITEM_PREFIXES[randInt(0, ITEM_PREFIXES.length - 1)];
+  const suffix = ITEM_SUFFIXES[randInt(0, ITEM_SUFFIXES.length - 1)];
+  Object.entries(prefix.statBonus).forEach(([stat, value]) => {
+    statBonus[stat] = (Number(statBonus[stat]) || 0) + value;
+  });
+  Object.entries(suffix.statBonus).forEach(([stat, value]) => {
+    statBonus[stat] = (Number(statBonus[stat]) || 0) + value;
+  });
+
   return createEquipmentItem(
     `${template.slot}_${uid()}`,
-    `${template.name} ${rarity === 'rare' ? 'редкого качества' : 'обычный'}`,
+    `${prefix.name} ${template.name} ${suffix.name}`,
     template.slot,
     rarity,
     statBonus
@@ -373,11 +445,12 @@ function addDailyQuestProgress(character, eventType, amount = 1) {
 
 function awardDailyQuestReward(character, quest) {
   character.xp += quest.reward.experience;
-  character.gold += quest.reward.gold;
+  character.gold = creditGold(character.gold, quest.reward.gold);
   const equipmentBonuses = getEquipmentBonuses(character.equipment);
   while (character.xp >= character.xpToNext) {
     character.xp -= character.xpToNext;
     character.level += 1;
+    character.talentPoints = (Number(character.talentPoints) || 0) + 1;
     character.str += 1;
     character.agi += 1;
     character.int += 1;
@@ -407,6 +480,9 @@ function buildCharacter(name, classId, passwordHash, faction = 'light', id = uid
     agi: base.agi,
     int: base.int,
     gold: 12,
+    talents: {},
+    talentPoints: 0,
+    resistances: { physical: 0, magic: 0, poison: 0 },
     mana: 100,
     maxMana: 100,
     location: 'town',
@@ -454,6 +530,9 @@ function serializeCharacter(character) {
     agi: character.agi,
     int: character.int,
     gold: character.gold,
+    talents: JSON.stringify(character.talents || {}),
+    talentPoints: Math.max(0, Math.floor(Number(character.talentPoints) || 0)),
+    resistances: JSON.stringify(normalizeResistances(character.resistances)),
     mana: character.mana ?? 100,
     maxMana: character.maxMana ?? 100,
     location: character.location,
@@ -471,6 +550,19 @@ function serializeCharacter(character) {
 
 function deserializeCharacter(row) {
   if (!row) return null;
+
+  const parseObject = (value, fallback) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value || '{}');
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+    return fallback;
+  };
 
   const inventory = sanitizeInventory(Array.isArray(row.inventory)
     ? row.inventory
@@ -504,6 +596,9 @@ function deserializeCharacter(row) {
     if (!(slot in equipment)) equipment[slot] = null;
     if (equipment[slot]) {
       equipment[slot].enhancement = normalizeEnhancementLevel(equipment[slot].enhancement);
+      equipment[slot].rarity = ['common', 'rare', 'epic', 'legendary'].includes(equipment[slot].rarity)
+        ? equipment[slot].rarity
+        : 'common';
     }
   }
   let potionEffects = row.potioneffects;
@@ -528,7 +623,10 @@ function deserializeCharacter(row) {
     str: row.str,
     agi: row.agi,
     int: row.int,
-    gold: row.gold,
+    gold: normalizeGold(row.gold),
+    talents: parseObject(row.talents, {}),
+    talentPoints: Math.max(0, Math.floor(Number(row.talentpoints ?? row.talentPoints) || 0)),
+    resistances: normalizeResistances(parseObject(row.resistances, {})),
     mana: row.mana ?? 100,
     maxMana: row.maxmana ?? 100,
     location: row.location,
@@ -563,6 +661,9 @@ async function initDatabase() {
     'agi INTEGER',
     'int INTEGER',
     'gold INTEGER',
+    'talents TEXT DEFAULT \'{}\'',
+    'talentpoints INTEGER DEFAULT 0',
+    'resistances TEXT DEFAULT \'{}\'',
     'mana INTEGER DEFAULT 100',
     'maxmana INTEGER DEFAULT 100',
     'location TEXT',
@@ -576,14 +677,6 @@ async function initDatabase() {
     'passwordhash TEXT',
     'createdat BIGINT'
   ];
-
-  const columns = await pool.query(`
-    SELECT lower(column_name) AS column_name
-    FROM information_schema.columns
-    WHERE table_name = 'characters'
-  `);
-
-  const present = new Set(columns.rows.map((r) => r.column_name));
 
   const createTableSql = `
     CREATE TABLE IF NOT EXISTS characters (
@@ -600,6 +693,9 @@ async function initDatabase() {
       agi INTEGER,
       int INTEGER,
       gold INTEGER,
+      talents TEXT DEFAULT '{}',
+      talentpoints INTEGER DEFAULT 0,
+      resistances TEXT DEFAULT '{}',
       mana INTEGER DEFAULT 100,
       maxmana INTEGER DEFAULT 100,
       location TEXT,
@@ -617,6 +713,13 @@ async function initDatabase() {
 
   await pool.query(createTableSql);
 
+  const columns = await pool.query(`
+    SELECT lower(column_name) AS column_name
+    FROM information_schema.columns
+    WHERE table_name = 'characters'
+  `);
+  const present = new Set(columns.rows.map((r) => r.column_name));
+
   for (const colDef of needed) {
     const [columnName, ...typeParts] = colDef.split(' ');
     const columnType = typeParts.join(' ');
@@ -631,8 +734,8 @@ async function saveCharacter(character) {
   const row = serializeCharacter(character);
   await pool.query(
     `INSERT INTO characters (
-      id, name, classid, faction, level, xp, xptonext, maxhp, hp, str, agi, int, gold, mana, maxmana, location, kills, inventory, equipment, potioneffects, quests, dailyquests, queststats, passwordhash, createdat
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+      id, name, classid, faction, level, xp, xptonext, maxhp, hp, str, agi, int, gold, talents, talentpoints, resistances, mana, maxmana, location, kills, inventory, equipment, potioneffects, quests, dailyquests, queststats, passwordhash, createdat
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
       classid = EXCLUDED.classid,
@@ -646,6 +749,9 @@ async function saveCharacter(character) {
       agi = EXCLUDED.agi,
       int = EXCLUDED.int,
       gold = EXCLUDED.gold,
+      talents = EXCLUDED.talents,
+      talentpoints = EXCLUDED.talentpoints,
+      resistances = EXCLUDED.resistances,
       mana = EXCLUDED.mana,
       maxmana = EXCLUDED.maxmana,
       location = EXCLUDED.location,
@@ -672,6 +778,9 @@ async function saveCharacter(character) {
       row.agi,
       row.int,
       row.gold,
+      row.talents,
+      row.talentPoints,
+      row.resistances,
       row.mana,
       row.maxMana,
       row.location,
@@ -828,22 +937,43 @@ app.post('/api/fight', async (req, res) => {
   const log = [];
   const equipmentBonuses = getEquipmentBonuses(char.equipment);
   const potionBonuses = getActivePotionBonuses(char);
-  const effectiveMaxHp = char.maxHp + equipmentBonuses.maxHp;
+  const combatCharacter = withEquipmentBonuses(char);
+  const effectiveMaxHp = combatCharacter.maxHp;
+  const attackType = char.classId === 'mage' ? 'magic' : char.classId === 'rogue' ? 'poison' : 'physical';
 
   while (char.hp > 0 && monster.hp > 0) {
-    const playerRoll = randInt(1, 6) + char.str + equipmentBonuses.str + potionBonuses.str + Math.floor(char.level / 2);
-    const monsterRoll = randInt(1, 6) + Math.max(0, monster.def);
-    const damage = Math.max(1, playerRoll - monsterRoll);
-
-    monster.hp -= damage;
-    log.push(`${char.name} наносит ${damage} урона ${monster.name}.`);
+    const baseStat = char.classId === 'mage' ? char.int + equipmentBonuses.int : char.str + equipmentBonuses.str;
+    const playerHit = resolveCombatHit({
+        baseDamage: randInt(1, 6) + baseStat + equipmentBonuses.attack + combatCharacter.talentBonuses.attack + potionBonuses.str + Math.floor(char.level / 2),
+      damageType: attackType,
+      defense: monster.def,
+      resistances: monster.resistances,
+      critChance: combatCharacter.critChance,
+      rng: Math.random
+    });
+    monster.hp = Math.max(0, monster.hp - playerHit.damage);
+    log.push(playerHit.dodged
+      ? `${monster.name} уклонился от вашей атаки.`
+      : `${char.name} наносит ${playerHit.damage} ${attackType} урона ${monster.name}${playerHit.critical ? ' критическим ударом' : ''}.`);
 
     if (monster.hp <= 0) break;
 
     const baseMonsterDamage = Math.max(1, monster.atk + randInt(0, 3) - Math.floor((char.agi + equipmentBonuses.agi) / 3));
-    const monsterDamage = calculateDamageAfterArmor(baseMonsterDamage, equipmentBonuses.armor + potionBonuses.armor);
-    char.hp -= monsterDamage;
-    log.push(`${monster.name} наносит ${monsterDamage} урона ${char.name}.`);
+    const monsterHit = resolveCombatHit({
+      baseDamage: baseMonsterDamage,
+      damageType: monster.damageType || 'physical',
+      defense: equipmentBonuses.defense,
+      armor: equipmentBonuses.armor + potionBonuses.armor,
+      resistances: combatCharacter.resistances,
+      dodgeChance: combatCharacter.dodgeChance,
+      blockChance: combatCharacter.blockChance,
+      rng: Math.random
+    });
+    char.hp = Math.max(0, char.hp - monsterHit.damage);
+    log.push(monsterHit.dodged
+      ? `Вы уклонились от атаки ${monster.name}.`
+      : `${monster.name} наносит ${monsterHit.damage} ${monsterHit.damageType} урона${monsterHit.blocked ? ' (блок)' : ''} ${char.name}.`);
+    if (char.hp > 0) char.hp = Math.min(effectiveMaxHp, char.hp + combatCharacter.healthRegen);
   }
 
   if (char.hp > 0) {
@@ -851,12 +981,13 @@ app.post('/api/fight', async (req, res) => {
     addDailyQuestProgress(char, 'defeat_enemies');
     if (char.location === 'cave') addDailyQuestProgress(char, 'visit_cave');
     char.xp += monster.xp;
-    char.gold += monster.gold;
+    char.gold = creditGold(char.gold, monster.gold);
     log.push(`${char.name} победил(а) ${monster.name}! Получено ${monster.xp} XP и ${monster.gold} золота.`);
 
     while (char.xp >= char.xpToNext) {
       char.xp -= char.xpToNext;
       char.level += 1;
+      char.talentPoints = (Number(char.talentPoints) || 0) + 1;
       char.str += 1;
       char.agi += 1;
       char.int += 1;
@@ -892,7 +1023,7 @@ app.post('/api/fight', async (req, res) => {
     updateQuests(char);
     if (char.quests.every((q) => q.done)) {
       const bonusGold = 50;
-      char.gold += bonusGold;
+      char.gold = creditGold(char.gold, bonusGold);
       log.push(`Все квесты выполнены! Получено ${bonusGold} золота в награду.`);
     }
 
@@ -901,7 +1032,7 @@ app.post('/api/fight', async (req, res) => {
   }
 
   char.hp = Math.max(1, Math.floor(effectiveMaxHp / 2));
-  char.gold = Math.max(0, char.gold - Math.floor(char.gold * 0.1));
+  char.gold = normalizeGold(char.gold - Math.floor(normalizeGold(char.gold) * 0.1));
   char.location = 'town';
   log.push(`${char.name} был(а) побежден(а), отступил(а) в город и потерял(а) часть золота.`);
 
@@ -913,16 +1044,16 @@ const FOREST_ENEMIES = [
   { name: 'Гоблин', hp: 14, atk: 4, def: 1, xp: 10, gold: 7 },
   { name: 'Орк', hp: 22, atk: 6, def: 2, xp: 16, gold: 12 },
   { name: 'Волк', hp: 18, atk: 5, def: 1, xp: 15, gold: 10 },
-  { name: 'Тролль', hp: 28, atk: 7, def: 2, xp: 20, gold: 15 }
+  { name: 'Тролль', hp: 28, atk: 7, def: 2, xp: 20, gold: 15, damageType: 'physical' }
 ];
 
 const CAVE_ENEMIES = [
-  { name: 'Пещерный Паук', hp: 24, atk: 7, def: 2, xp: 20, gold: 14 },
+  { name: 'Пещерный Паук', hp: 24, atk: 7, def: 2, xp: 20, gold: 14, damageType: 'poison' },
   { name: 'Минотавр', hp: 36, atk: 9, def: 3, xp: 30, gold: 22 },
-  { name: 'Каменный Голем', hp: 44, atk: 8, def: 5, xp: 34, gold: 26 }
+  { name: 'Каменный Голем', hp: 44, atk: 8, def: 5, xp: 34, gold: 26, damageType: 'magic', resistances: { physical: 15 } }
 ];
 
-const BOSS_TEMPLATE = { name: 'Король Гоблинов', hp: 60, atk: 10, def: 3, xp: 120, gold: 150 };
+const BOSS_TEMPLATE = { name: 'Король Гоблинов', hp: 60, atk: 10, def: 3, xp: 120, gold: 150, resistances: { poison: 10 } };
 const FIGHT_LOCATIONS = ['forest', 'cave'];
 const fightSessions = new Map();
 
@@ -950,26 +1081,26 @@ function createBoss(level) {
   };
 }
 
-function calculateDamageAfterArmor(baseDamage, armor) {
-  const percentReduction = Math.pow(armor / 200, 2) * 100;
-  const fixedReduction = Math.floor(armor / 3);
-  const finalDamage = Math.max(1, baseDamage * (1 - percentReduction / 100) - fixedReduction);
-  return Math.round(finalDamage);
-}
-
 function describeBonuses(item) {
-  return Object.entries(item.statBonus).filter(([, v]) => v > 0).map(([k, v]) => `${k} +${v}`).join(', ');
+  const bonuses = Object.entries(item.statBonus)
+    .filter(([key, value]) => key !== 'resistances' && Number(value) > 0)
+    .map(([key, value]) => `${key} +${value}`);
+  Object.entries(item.statBonus.resistances || {}).forEach(([type, value]) => {
+    if (Number(value) > 0) bonuses.push(`${type} resistance +${value}%`);
+  });
+  return bonuses.join(', ');
 }
 
 function grantReward(char, reward, log, { equipmentChance, equipmentRarity }) {
   char.xp += reward.xp;
-  char.gold += reward.gold;
+  char.gold = creditGold(char.gold, reward.gold);
   log.push(`Получено ${reward.xp} XP и ${reward.gold} золота.`);
 
   const bonuses = getEquipmentBonuses(char.equipment);
   while (char.xp >= char.xpToNext) {
     char.xp -= char.xpToNext;
     char.level += 1;
+    char.talentPoints = (Number(char.talentPoints) || 0) + 1;
     char.str += 1;
     char.agi += 1;
     char.int += 1;
@@ -1053,15 +1184,25 @@ app.post('/api/fight/attack', async (req, res) => {
   const alive = session.enemies.filter((e) => e.hp > 0);
   const target = alive.find((e) => e.id === req.body.targetId) || alive[0];
   const bonuses = getEquipmentBonuses(char.equipment);
+  const potionBonuses = getActivePotionBonuses(char);
+  const combatCharacter = withEquipmentBonuses(char);
   const log = [];
 
-  const crit = Math.random() < 0.1;
-  const base = randInt(1, 6) + char.str + bonuses.str + getActivePotionBonuses(char).str + Math.floor(char.level / 2);
-  const damage = Math.max(1, (crit ? base * 2 : base) - target.def);
-  target.hp = Math.max(0, target.hp - damage);
-  log.push(crit
-    ? `Вы нанесли критический удар! ${damage} урона`
-    : `Вы атаковали ${target.name} на ${damage} урона`);
+  const attackType = char.classId === 'mage' ? 'magic' : char.classId === 'rogue' ? 'poison' : 'physical';
+  const baseStat = char.classId === 'mage' ? char.int + bonuses.int : char.str + bonuses.str;
+  const playerHit = resolveCombatHit({
+    baseDamage: randInt(1, 6) + baseStat + bonuses.attack + combatCharacter.talentBonuses.attack + potionBonuses.str + Math.floor(char.level / 2),
+    damageType: attackType,
+    defense: target.def,
+    armor: target.armor,
+    resistances: target.resistances,
+    critChance: combatCharacter.critChance,
+    rng: Math.random
+  });
+  target.hp = Math.max(0, target.hp - playerHit.damage);
+  log.push(playerHit.dodged
+    ? `${target.name} уклонился от вашей атаки.`
+    : `Вы атаковали ${target.name} на ${playerHit.damage} ${attackType} урона${playerHit.critical ? ' критическим ударом' : ''}.`);
 
   if (target.hp <= 0) {
     log.push(target.isBoss ? 'Босс повержен!' : 'Враг повержен!');
@@ -1076,13 +1217,24 @@ app.post('/api/fight/attack', async (req, res) => {
 
   for (const enemy of session.enemies.filter((e) => e.hp > 0)) {
     const baseDamage = enemy.atk + randInt(0, 3) - Math.floor((char.agi + bonuses.agi) / 3);
-    const armor = bonuses.armor + getActivePotionBonuses(char).armor;
-    const hit = calculateDamageAfterArmor(baseDamage, armor);
-    char.hp = Math.max(0, char.hp - hit);
-    const prevented = Math.max(0, baseDamage - hit);
-    log.push(`${enemy.name} атаковал вас на ${hit} урона${armor ? ` (защита: ${armor}, снижено на ${prevented})` : ''}`);
+    const hit = resolveCombatHit({
+      baseDamage,
+      damageType: enemy.damageType || 'physical',
+      defense: bonuses.defense,
+      armor: bonuses.armor + potionBonuses.armor,
+      resistances: combatCharacter.resistances,
+      dodgeChance: combatCharacter.dodgeChance,
+      blockChance: combatCharacter.blockChance,
+      rng: Math.random
+    });
+    char.hp = Math.max(0, char.hp - hit.damage);
+    log.push(hit.dodged
+      ? `Вы уклонились от атаки ${enemy.name}.`
+      : `${enemy.name} атаковал вас на ${hit.damage} ${hit.damageType} урона${hit.blocked ? ' (блок)' : ''}.`);
     if (char.hp <= 0) break;
   }
+
+  if (char.hp > 0) char.hp = Math.min(combatCharacter.maxHp, char.hp + combatCharacter.healthRegen);
 
   if (char.hp <= 0) {
     session.phase = 'defeated';
@@ -1148,6 +1300,7 @@ const PAGES = {
   '/character': 'character.html',
   '/hero-stats': 'hero-stats.html',
   '/quests': 'quests.html',
+  '/talents': 'talents.html',
   '/fight': 'fight.html',
   '/inventory': 'inventory.html',
   '/equipment': 'equipment.html',
@@ -1159,6 +1312,38 @@ const PAGES = {
 for (const [route, file] of Object.entries(PAGES)) {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'public', file)));
 }
+
+app.get('/api/talents', async (req, res) => {
+  if (!req.query.id) return res.status(400).json({ error: 'Нужно id персонажа.' });
+  const char = await loadCharacterById(req.query.id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+  res.json({
+    talents: char.talents,
+    talentPoints: char.talentPoints,
+    trees: TALENT_TREES,
+    bonuses: getTalentBonuses(char.talents)
+  });
+});
+
+app.post('/api/talents/upgrade', async (req, res) => {
+  if (!req.body.id) return res.status(400).json({ error: 'Нужно id персонажа.' });
+  const char = await loadCharacterById(req.body.id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+  try {
+    const upgraded = upgradeTalent(char.talents, char.talentPoints, req.body.talentId);
+    char.talents = upgraded.talents;
+    char.talentPoints = upgraded.talentPoints;
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  await saveCharacter(char);
+  res.json({
+    character: stripPassword(withEquipmentBonuses(char)),
+    talents: char.talents,
+    talentPoints: char.talentPoints,
+    bonuses: getTalentBonuses(char.talents)
+  });
+});
 
 app.get('/api/equipment', async (req, res) => {
   const id = req.query.id;
@@ -1243,7 +1428,7 @@ app.post('/api/enhanceItem', async (req, res) => {
     return res.status(400).json({ error: `Не хватает золота! Нужно: ${cost}, Есть: ${char.gold}` });
   }
 
-  char.gold -= cost;
+  char.gold = spendGold(char.gold, cost);
   const success = Math.random() * 100 < ENHANCEMENT_CHANCES[enhancement];
   if (success) item.enhancement = enhancement + 1;
 
@@ -1386,9 +1571,10 @@ app.post('/api/buyPotion', async (req, res) => {
   const { id } = req.body;
   const char = await loadCharacterById(id);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
+  char.gold = normalizeGold(char.gold);
   if (char.gold < 10) return res.status(400).json({ error: 'Недостаточно золота.' });
 
-  char.gold -= 10;
+  char.gold = spendGold(char.gold, 10);
   const potionId = POTIONS[req.body.potionId] ? req.body.potionId : 'potion_health';
   const existing = char.inventory.find((item) => item.id === potionId);
   if (existing) existing.qty += 1;
@@ -1399,6 +1585,17 @@ app.post('/api/buyPotion', async (req, res) => {
   res.json({ message: `Куплено: ${POTIONS[potionId].name}.`, character: stripPassword(withEquipmentBonuses(char)) });
 });
 
+app.get('/api/shop', async (req, res) => {
+  if (!req.query.id) return res.status(400).json({ error: 'Нужно id персонажа.' });
+  const char = await loadCharacterById(req.query.id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+  res.json({
+    items: SHOP_EQUIPMENT.map((item) => ({ ...item, rarity: 'common', price: SHOP_ITEM_PRICE })),
+    inventory: char.inventory.filter((item) => item.slot && EQUIPMENT_SLOTS.includes(item.slot))
+      .map((item) => ({ ...item, sellPrice: getSalePrice(item, SHOP_ITEM_PRICE) }))
+  });
+});
+
 app.post('/api/buyEquipment', async (req, res) => {
   const { id, itemId } = req.body;
   const item = SHOP_EQUIPMENT.find((candidate) => candidate.id === itemId);
@@ -1406,9 +1603,10 @@ app.post('/api/buyEquipment', async (req, res) => {
 
   const char = await loadCharacterById(id);
   if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+  char.gold = normalizeGold(char.gold);
   if (char.gold < SHOP_ITEM_PRICE) return res.status(400).json({ error: 'Недостаточно золота.' });
 
-  char.gold -= SHOP_ITEM_PRICE;
+  char.gold = spendGold(char.gold, SHOP_ITEM_PRICE);
   char.inventory.push(createEquipmentItem(
     `${item.id}_${uid()}`,
     item.name,
@@ -1421,15 +1619,35 @@ app.post('/api/buyEquipment', async (req, res) => {
   res.json({ message: `Куплено: ${item.name}.`, character: stripPassword(withEquipmentBonuses(char)) });
 });
 
+app.post('/api/sellItem', async (req, res) => {
+  const { id, itemId } = req.body;
+  if (!id || !itemId) return res.status(400).json({ error: 'Нужно указать персонажа и предмет.' });
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+  const index = char.inventory.findIndex((item) => item.id === itemId && item.slot && EQUIPMENT_SLOTS.includes(item.slot));
+  if (index < 0) return res.status(400).json({ error: 'Предмет не найден в инвентаре или не может быть продан.' });
+
+  const [item] = char.inventory.splice(index, 1);
+  const price = getSalePrice(item, SHOP_ITEM_PRICE);
+  char.gold = creditGold(char.gold, price);
+  await saveCharacter(char);
+  res.json({
+    message: `Продано: ${item.name} за ${price} золота.`,
+    character: stripPassword(withEquipmentBonuses(char)),
+    salePrice: price
+  });
+});
+
 app.post('/api/buyEquipmentSet', async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'Нужно id персонажа.' });
 
   const char = await loadCharacterById(id);
   if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+  char.gold = normalizeGold(char.gold);
   if (char.gold < SHOP_SET_PRICE) return res.status(400).json({ error: 'Недостаточно золота.' });
 
-  char.gold -= SHOP_SET_PRICE;
+  char.gold = spendGold(char.gold, SHOP_SET_PRICE);
   char.inventory.push(...SHOP_EQUIPMENT.map((item) => createEquipmentItem(
     `${item.id}_${uid()}`,
     item.name,

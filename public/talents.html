@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Таланты — RPG World</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="page-shell">
+    <main class="panel gear-page">
+      <header class="auth-header">
+        <span class="eyebrow">Развитие героя</span>
+        <h1>Таланты</h1>
+      </header>
+      <p class="gold-display">Очки талантов: <strong id="talentPoints">0</strong></p>
+      <div id="talentTrees" class="talent-trees"></div>
+      <p id="talentMessage" class="gear-message" role="status" aria-live="polite"></p>
+      <nav class="gear-nav" aria-label="Навигация">
+        <a href="/character">В профиль</a>
+        <a href="/city">В город</a>
+      </nav>
+    </main>
+  </div>
+  <script src="/talents.js"></script>
+</body>
+</html>

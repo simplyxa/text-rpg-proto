@@ -3,8 +3,10 @@ const assert = require('node:assert/strict');
 const {
   getSalePrice,
   getTalentBonuses,
+  creditGold,
   normalizeGold,
   resolveCombatHit,
+  spendGold,
   upgradeTalent
 } = require('../game-systems');
 
@@ -16,6 +18,15 @@ test('combat applies damage type resistance and physical armor', () => {
     rng: () => 0.99
   });
   assert.equal(hit.damage, 15);
+
+  const magicHit = resolveCombatHit({
+    baseDamage: 20,
+    damageType: 'magic',
+    resistances: { magic: 10 },
+    armor: 100,
+    rng: () => 0.99
+  });
+  assert.equal(magicHit.damage, 18);
 
   const physicalHit = resolveCombatHit({
     baseDamage: 20,
@@ -57,4 +68,8 @@ test('shop prices and currency are normalized safely', () => {
   assert.equal(getSalePrice({}, 1500), 750);
   assert.equal(normalizeGold(-5), 0);
   assert.equal(normalizeGold(2.8), 2);
+  assert.equal(normalizeGold(Infinity), 0);
+  assert.equal(spendGold(1500, 1500), 0);
+  assert.throws(() => spendGold(1499, 1500), /Недостаточно золота/);
+  assert.equal(creditGold(-5, 750), 750);
 });

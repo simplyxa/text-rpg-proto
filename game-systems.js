@@ -113,7 +113,20 @@ function upgradeTalent(talents = {}, points = 0, talentId) {
 }
 
 function normalizeGold(value) {
-  return Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(Number(value) || 0)));
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return 0;
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(amount)));
+}
+
+function spendGold(gold, cost) {
+  const balance = normalizeGold(gold);
+  const price = normalizeGold(cost);
+  if (price < 1 || balance < price) throw new Error('Недостаточно золота.');
+  return balance - price;
+}
+
+function creditGold(gold, amount) {
+  return normalizeGold(normalizeGold(gold) + normalizeGold(amount));
 }
 
 function getSalePrice(item, basePrice) {
@@ -127,8 +140,10 @@ module.exports = {
   TALENT_TREES,
   getSalePrice,
   getTalentBonuses,
+  creditGold,
   normalizeGold,
   normalizeResistances,
   resolveCombatHit,
+  spendGold,
   upgradeTalent
 };
