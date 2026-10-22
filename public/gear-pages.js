@@ -11,14 +11,14 @@ const PAGE_SLOTS = [
   { id: 'cloak', name: 'Правая рука' }
 ];
 const SHOP_ITEMS = [
-  { id: 'helmet', name: 'Шлем' },
-  { id: 'amulet', name: 'Амулет' },
-  { id: 'armor', name: 'Броня' },
-  { id: 'gloves', name: 'Перчатки' },
-  { id: 'pants', name: 'Штаны' },
-  { id: 'boots', name: 'Сапоги' },
-  { id: 'left_blade', name: 'Левый клинок' },
-  { id: 'right_blade', name: 'Правый клинок' }
+  { id: 'helmet', name: 'Шлем', armor: 2 },
+  { id: 'amulet', name: 'Амулет', armor: 1 },
+  { id: 'armor', name: 'Броня', armor: 5 },
+  { id: 'gloves', name: 'Перчатки', armor: 1 },
+  { id: 'pants', name: 'Штаны', armor: 2 },
+  { id: 'boots', name: 'Сапоги', armor: 1 },
+  { id: 'left_blade', name: 'Левый клинок', armor: 0 },
+  { id: 'right_blade', name: 'Правый клинок', armor: 3 }
 ];
 
 let characterId;
@@ -70,6 +70,13 @@ function rarityName(rarity) {
   })[rarity] || rarity || 'Обычный';
 }
 
+function itemArmor(item) {
+  if (Object.hasOwn(item?.statBonus || {}, 'armor')) return Number(item.statBonus.armor) || 0;
+  const shopItem = SHOP_ITEMS.find((candidate) => candidate.name === item?.name || item?.id === candidate.id || item?.id?.startsWith(`${candidate.id}_`));
+  const slotArmor = { helmet: 2, ring: 1, chest: 5, hands: 1, armor: 2, boots: 1, shield: 3, cloak: 0 };
+  return shopItem?.armor ?? slotArmor[item?.slot] ?? 0;
+}
+
 function createGearRow(name, rarity, details = '') {
   const row = document.createElement('article');
   row.className = 'gear-row';
@@ -97,6 +104,7 @@ function createGearRow(name, rarity, details = '') {
 }
 
 function renderEquipmentPage() {
+  document.getElementById('equipmentTotal').textContent = `Общая защита: ${Number(character.armor) || Object.values(character.equipment || {}).reduce((total, item) => total + itemArmor(item), 0)}`;
   const container = document.getElementById('equipmentList');
   container.replaceChildren();
   PAGE_SLOTS.forEach(({ id, name }) => {
@@ -111,7 +119,10 @@ function renderEquipmentPage() {
       itemName.textContent = item.name;
       const rarity = document.createElement('span');
       rarity.textContent = rarityName(item.rarity);
-      itemDetails.append(itemName, rarity);
+      const armor = document.createElement('span');
+      armor.className = 'armor-bonus';
+      armor.textContent = `Защита: +${itemArmor(item)}`;
+      itemDetails.append(itemName, rarity, armor);
       row.append(itemDetails);
 
       const button = document.createElement('button');
@@ -169,7 +180,8 @@ async function renderInventoryPage() {
   }
 
   items.forEach((item) => {
-    const row = createGearRow(item.name, item.rarity, item.qty > 1 ? `Количество: ${item.qty}` : '');
+    const details = [item.slot ? `Защита: +${itemArmor(item)}` : '', item.qty > 1 ? `Количество: ${item.qty}` : ''].filter(Boolean).join(' • ');
+    const row = createGearRow(item.name, item.rarity, details);
     if (item.equipped) {
       const equippedLabel = document.createElement('span');
       equippedLabel.className = 'equipped-label';
@@ -223,7 +235,7 @@ async function loadShopPage() {
   const container = document.getElementById('shopItems');
   container.replaceChildren();
   SHOP_ITEMS.forEach((item) => {
-    const row = createGearRow(item.name, 'common', '1500 золота');
+    const row = createGearRow(item.name, 'common', `Защита: +${item.armor} • 1500 золота`);
     const button = document.createElement('button');
     button.className = 'small-btn';
     button.type = 'button';

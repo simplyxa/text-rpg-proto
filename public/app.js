@@ -82,7 +82,9 @@ const RARITY_NAMES = {
   legendary: 'Легендарный'
 };
 
-const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', maxHp: 'Макс. HP' };
+const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', maxHp: 'Макс. HP', armor: 'Защита' };
+const EQUIPMENT_ARMOR = { helmet: 2, ring: 1, chest: 5, hands: 1, armor: 2, boots: 1, shield: 3, cloak: 0 };
+const SHOP_ITEM_ARMOR = { Шлем: 2, Амулет: 1, Броня: 5, Перчатки: 1, Штаны: 2, Сапоги: 1, 'Левый клинок': 0, 'Правый клинок': 3 };
 
 const CLASS_SKILLS = {
   warrior: {
@@ -327,6 +329,7 @@ function renderCharacter(c) {
     HP: ${safeC.hp}/${safeC.maxHp}<br>
     Сила: ${safeC.str} | Ловкость: ${safeC.agi} | Интеллект: ${safeC.int}<br>
     Опыт: ${safeC.xp}/${safeC.xpToNext}<br>
+    Защита: ${safeC.armor || 0}<br>
     Золото: ${safeC.gold}<br>
     Локация: ${safeC.location}
   `;
@@ -349,6 +352,7 @@ function renderCharacter(c) {
     <p><strong>Ловкость:</strong> ${safeC.agi}</p>
     <p><strong>Интеллект:</strong> ${safeC.int}</p>
     <p><strong>Опыт:</strong> ${safeC.xp}/${safeC.xpToNext}</p>
+    <p class="armor-stat"><strong>Защита:</strong> ${safeC.armor || 0}</p>
     <p><strong>Золото:</strong> ${safeC.gold}</p>
     <p><strong>Локация:</strong> ${safeC.location}</p>
 
@@ -596,11 +600,12 @@ async function renderInventoryTab() {
 
   inventoryContent.innerHTML = res.inventory.map((item, idx) => {
     const slot = EQUIPMENT_SLOTS.find((candidate) => candidate.id === item.slot);
+    const armor = itemArmor(item);
     return `
       <div class="item-row">
         <div class="item-name${slot ? ` rarity-${escapeHtml(item.rarity || 'common')}` : ''}"${slot ? ` title="${escapeHtml(formatStatBonuses(item.statBonus))}"` : ''}>
           ${slot ? `<svg class="equipment-icon inventory-equipment-icon" aria-hidden="true"><use href="/equipment-icons.svg#${slot.id}"></use></svg><span>${slot.name} • </span>` : ''}
-          ${escapeHtml(item.name)}${slot ? ` • ${RARITY_NAMES[item.rarity] || escapeHtml(item.rarity)}` : ` x${item.qty}`}
+          ${escapeHtml(item.name)}${slot ? ` • ${RARITY_NAMES[item.rarity] || escapeHtml(item.rarity)} • Защита: +${armor}` : ` x${item.qty}`}
         </div>
         ${slot
           ? `<button class="small-btn" data-equip-inventory="${idx}" type="button">Надеть</button>`
@@ -646,6 +651,12 @@ function formatStatBonuses(bonuses = {}) {
     .filter(([key]) => Number(bonuses[key]))
     .map(([key, name]) => `${name} +${Number(bonuses[key])}`)
     .join(' • ') || 'Без бонусов';
+}
+
+function itemArmor(item) {
+  if (Object.hasOwn(item?.statBonus || {}, 'armor')) return Number(item.statBonus.armor) || 0;
+  const shopItem = Object.entries(SHOP_ITEM_ARMOR).find(([name]) => name === item?.name);
+  return shopItem?.[1] ?? EQUIPMENT_ARMOR[item?.slot] ?? 0;
 }
 
 function formatStatChanges(previous, next) {
@@ -714,10 +725,10 @@ async function renderEquipmentTab() {
               <strong>${slot.name}</strong>
             </div>
             ${item
-              ? `<div class="equipment-item rarity-${rarity}" title="${escapeHtml(formatStatBonuses(item.statBonus))}">
+              ? `<div class="equipment-item rarity-${rarity}" title="${escapeHtml(formatStatBonuses({ ...item.statBonus, armor: itemArmor(item) }))}">
                   <strong>${escapeHtml(item.name)}</strong>
                   <span>${RARITY_NAMES[item.rarity] || escapeHtml(item.rarity)}</span>
-                  <small>${escapeHtml(formatStatBonuses(item.statBonus))}</small>
+                  <small>${escapeHtml(formatStatBonuses({ ...item.statBonus, armor: itemArmor(item) }))}</small>
                 </div>
                 <button class="small-btn" data-unequip-slot="${slot.id}" type="button">Снять</button>`
               : '<div class="equipment-empty">Пусто</div>'}
@@ -735,6 +746,7 @@ async function renderEquipmentTab() {
       }).join('')}
     </div>
     <div class="equipment-total">
+      <strong>Общая защита:</strong> ${Number(res.bonuses?.armor) || 0}<br>
       <strong>Общие бонусы:</strong> ${escapeHtml(formatStatBonuses(res.bonuses))}
     </div>
   `;
