@@ -12,28 +12,63 @@
     <span class="experience-percentage">0%</span>
   </div>
   <div class="page-shell">
-    <div class="panel character-page">
-      <div class="auth-header">
-        <span class="eyebrow" id="heroName"></span>
-        <h1 id="cityTitle">Город</h1>
-      </div>
+    <main class="game-hub" aria-label="Главное меню">
+      <header class="hub-topbar">
+        <a class="hub-brand" href="/city" aria-label="War of Souls — главная">WAR OF SOULS</a>
+        <div class="hub-resources" aria-label="Ресурсы героя">
+          <span>◈ <strong id="hubGold">0</strong> золота</span>
+          <span>✦ <strong id="hubEnergy">100</strong> энергии</span>
+        </div>
+      </header>
 
-      <div class="content-box">
-        <p>Вы в городе. Выберите действие:</p>
-
-        <ul class="location-list">
-          <li><a href="/forest">Лес</a> — тёмный лес, одиночные враги.</li>
-          <li><a href="/cave">Пещера</a> — группа врагов и босс.</li>
-        </ul>
-
-        <div class="button-column">
-          <button class="primary-btn" data-action="shop" type="button">Магазин</button>
-          <button class="primary-btn" data-action="inventory" type="button">Инвентарь</button>
-          <button class="primary-btn" data-action="quests" type="button">Квесты</button>
-          <button class="primary-btn" data-action="profile" type="button">Персонаж</button>
+      <div class="hub-intro">
+        <span class="hub-kicker" id="heroName">Северные земли</span>
+        <h1 id="cityTitle">Варвары</h1>
+        <div class="hub-hero" role="img" aria-label="Заснеженные горы и древняя крепость">
+          <span>Зов битвы</span>
         </div>
       </div>
-    </div>
+
+      <div class="hub-events" aria-label="Расписание событий">
+        <p>Подземелья откроются через <strong data-countdown="8130">02:15:30</strong></p>
+        <p>Дуэли откроются через <strong data-countdown="20520">05:42:00</strong></p>
+      </div>
+
+      <div id="hubNotice" class="hub-notice" role="status" aria-live="polite"></div>
+
+      <section class="hub-section" aria-labelledby="battleHeading">
+        <h2 id="battleHeading">Сражения</h2>
+        <div class="hub-menu">
+          <button type="button" data-hub-action="tower">Башни <span>›</span></button>
+          <button type="button" data-hub-action="forest">Арена <em>+</em><span>›</span></button>
+          <button type="button" data-hub-action="coming">Замки <span>›</span></button>
+          <button type="button" data-hub-action="coming">Турниры <span>›</span></button>
+          <button type="button" data-hub-action="forest">Выживание <em>+</em><span>›</span></button>
+          <button type="button" data-hub-action="coming">Великие битвы <span>›</span></button>
+          <button type="button" data-hub-action="cave">Пещеры и драконы <span>›</span></button>
+          <button type="button" data-hub-action="coming">Расписание игр <span>›</span></button>
+          <button type="button" data-hub-action="quests">Задания <span>›</span></button>
+          <button type="button" data-hub-action="forest">Поход <small>(лес)</small><span>›</span></button>
+        </div>
+      </section>
+
+      <section class="hub-section" aria-labelledby="tradeHeading">
+        <h2 id="tradeHeading">Торговля</h2>
+        <div class="hub-menu">
+          <button type="button" data-hub-action="shop">Купить золото <span>›</span></button>
+          <button type="button" data-hub-action="shop">Лавка мастеров <em>+</em><span>›</span></button>
+          <button type="button" data-hub-action="shop">Магазины <span>›</span></button>
+          <button type="button" data-hub-action="coming">Аукционы <span>›</span></button>
+          <button type="button" data-hub-action="coming">Профессии <span>›</span></button>
+          <button type="button" data-hub-action="coming">Колодец удачи <em>+</em><span>›</span></button>
+        </div>
+      </section>
+
+      <nav class="hub-navigation" aria-label="Персонаж">
+        <button type="button" data-hub-action="character">Мой герой <span>›</span></button>
+        <button type="button" data-hub-action="coming">Мой клан <span>›</span></button>
+      </nav>
+    </main>
   </div>
 
   <script src="/experience-bar.js"></script>

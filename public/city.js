@@ -32,6 +32,9 @@ function loadHero() {
   }
 
   document.getElementById('heroName').textContent = hero.name;
+  document.getElementById('cityTitle').textContent = hero.faction === 'dark' ? 'Тёмные' : 'Светлые';
+  document.getElementById('hubGold').textContent = Number(hero.gold) || 0;
+  document.getElementById('hubEnergy').textContent = Number(hero.mana) || 100;
 
   return hero;
 }
@@ -39,6 +42,40 @@ function loadHero() {
 document.addEventListener('DOMContentLoaded', () => {
   const hero = loadHero();
   if (!hero) return;
+
+  document.querySelectorAll('[data-countdown]').forEach((timer) => {
+    let secondsRemaining = Number(timer.dataset.countdown) || 0;
+    const updateTimer = () => {
+      const hours = String(Math.floor(secondsRemaining / 3600)).padStart(2, '0');
+      const minutes = String(Math.floor((secondsRemaining % 3600) / 60)).padStart(2, '0');
+      const seconds = String(secondsRemaining % 60).padStart(2, '0');
+      timer.textContent = `${hours}:${minutes}:${seconds}`;
+      secondsRemaining = Math.max(0, secondsRemaining - 1);
+    };
+    updateTimer();
+    window.setInterval(updateTimer, 1000);
+  });
+
+  document.querySelectorAll('[data-hub-action]').forEach((button) => {
+    button.onclick = () => {
+      const action = button.dataset.hubAction;
+      const routes = {
+        tower: '/towers-map',
+        forest: '/forest',
+        cave: '/cave',
+        quests: '/quests',
+        shop: '/shop',
+        character: '/character'
+      };
+
+      if (routes[action]) {
+        window.location.href = routes[action];
+        return;
+      }
+
+      document.getElementById('hubNotice').textContent = 'Этот раздел скоро появится в игре.';
+    };
+  });
 
   document.querySelectorAll('[data-action]').forEach((button) => {
     button.onclick = () => {
