@@ -37,6 +37,13 @@ function updateBattleLog(message) {
   document.getElementById('battleLog').innerHTML = battleLog.map((line) => `<div class="log-line">${escapeHtml(line)}</div>`).join('');
 }
 
+function animateElement(element, className, duration) {
+  element.classList.remove(className);
+  void element.offsetWidth;
+  element.classList.add(className);
+  window.setTimeout(() => element.classList.remove(className), duration);
+}
+
 async function post(url, body) {
   const res = await fetch(url, {
     method: 'POST',
@@ -63,6 +70,7 @@ function renderEnemies() {
   box.innerHTML = fightState.enemies.map((enemy) => {
     const classes = ['enemy-card'];
     if (enemy.hp <= 0) classes.push('dead');
+    if (enemy.maxHp > 0 && enemy.hp / enemy.maxHp < 0.3) classes.push('low-health');
     if (enemy.id === selectedTargetId) classes.push('selected');
     return `<div class="${classes.join(' ')}" data-id="${escapeHtml(enemy.id)}">
       <strong>${escapeHtml(enemy.name)}</strong>
@@ -149,7 +157,14 @@ async function startBoss() {
 }
 
 async function attack() {
-  applyResponse(await post('/api/fight/attack', { targetId: selectedTargetId }));
+  const targetId = selectedTargetId;
+  if (!applyResponse(await post('/api/fight/attack', { targetId }))) return;
+  const targetCard = [...document.querySelectorAll('.enemy-card')]
+    .find((card) => card.dataset.id === targetId);
+  if (targetCard) {
+    animateElement(targetCard, 'shake', 300);
+    animateElement(targetCard, 'red-flash', 400);
+  }
 }
 
 async function leave() {
