@@ -835,7 +835,7 @@ app.post('/api/fight/bosses/defeat', async (req, res) => {
   res.json({ log, character: stripPassword(withEquipmentBonuses(char)) });
 });
 
-const PAGES = { '/city': 'city.html', '/forest': 'forest.html', '/cave': 'cave.html', '/character': 'character.html', '/fight': 'fight.html' };
+const PAGES = { '/city': 'city.html', '/forest': 'forest.html', '/cave': 'cave.html', '/character': 'character.html', '/fight': 'fight.html', '/inventory': 'index.html', '/equipment': 'index.html' };
 for (const [route, file] of Object.entries(PAGES)) {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'public', file)));
 }

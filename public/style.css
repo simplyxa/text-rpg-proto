@@ -825,6 +825,35 @@ select option {
   border-radius: 16px;
 }
 
+.character-page > .content-box {
+  text-align: center;
+}
+
+.character-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.character-nav a {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.character-nav a:hover {
+  text-decoration: underline;
+  transform: scale(1.03);
+}
+
+.character-nav-bottom {
+  margin: 20px 0 0;
+}
+
 .character-block {
   border: 1px solid transparent;
   border-radius: 12px;
