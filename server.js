@@ -11,6 +11,12 @@ const pool = new Pool({
 });
 
 const EQUIPMENT_SLOTS = ['helmet', 'chest', 'shield', 'hands', 'armor', 'boots', 'cloak', 'ring'];
+const POTIONS = {
+  potion_health: { name: 'Зелье Здоровья', effect: '+50 HP', type: 'health' },
+  potion_mana: { name: 'Зелье Маны', effect: '+30 Mana', type: 'mana' },
+  potion_strength: { name: 'Зелье Усиления', effect: '+5 Урона на 10 сек', type: 'strength' },
+  potion_armor: { name: 'Зелье Защиты', effect: '+10 Защиты на 10 сек', type: 'armor' }
+};
 
 const LOCATIONS = [
   { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
@@ -113,17 +119,43 @@ function getEquipmentBonuses(equipment = {}) {
 function withEquipmentBonuses(character) {
   if (!character) return character;
   const bonuses = getEquipmentBonuses(character.equipment);
+  const potionBonuses = getActivePotionBonuses(character);
   const maxHp = character.maxHp + bonuses.maxHp;
   return {
     ...character,
-    str: character.str + bonuses.str,
+    str: character.str + bonuses.str + potionBonuses.str,
     agi: character.agi + bonuses.agi,
     int: character.int + bonuses.int,
-    armor: bonuses.armor,
+    armor: bonuses.armor + potionBonuses.armor,
     maxHp,
     hp: Math.min(character.hp, maxHp),
     equipmentBonuses: bonuses
   };
+}
+
+function getActivePotionBonuses(character) {
+  const now = Date.now();
+  character.potionEffects = (character.potionEffects || []).filter((effect) => effect.expiresAt > now);
+  return character.potionEffects.reduce((bonuses, effect) => {
+    if (effect.type === 'strength') bonuses.str += Number(effect.value) || 0;
+    if (effect.type === 'armor') bonuses.armor += Number(effect.value) || 0;
+    return bonuses;
+  }, { str: 0, armor: 0 });
+}
+
+function sanitizeInventory(inventory = []) {
+  return inventory
+    .filter((item) => item?.id !== 'food' && item?.name !== 'Пирожок')
+    .map((item) => item?.id === 'potion'
+      ? { ...item, id: 'potion_health', name: POTIONS.potion_health.name, heal: 50 }
+      : item);
+}
+
+function hasLegacyInventoryItems(row) {
+  const inventory = Array.isArray(row.inventory)
+    ? row.inventory
+    : (typeof row.inventory === 'string' ? JSON.parse(row.inventory || '[]') : []);
+  return inventory.some((item) => item?.id === 'food' || item?.id === 'potion' || item?.name === 'Пирожок');
 }
 
 function randInt(min, max) {
@@ -362,14 +394,16 @@ function buildCharacter(name, classId, passwordHash, faction = 'light', id = uid
     agi: base.agi,
     int: base.int,
     gold: 12,
+    mana: 100,
+    maxMana: 100,
     location: 'town',
     kills: 0,
     inventory: [
-      { id: 'potion', name: 'Зелье лечения', qty: 2, heal: 15 },
-      { id: 'food', name: 'Пирожок', qty: 1, heal: 8 },
+      { id: 'potion_health', name: POTIONS.potion_health.name, qty: 2, heal: 50 },
       ...createEquipmentInventory()
     ],
     equipment: createDefaultEquipment(),
+    potionEffects: [],
     quests: createDefaultQuests(),
     dailyQuests: [],
     questStats: null,
@@ -407,10 +441,13 @@ function serializeCharacter(character) {
     agi: character.agi,
     int: character.int,
     gold: character.gold,
+    mana: character.mana ?? 100,
+    maxMana: character.maxMana ?? 100,
     location: character.location,
     kills: character.kills,
-    inventory: JSON.stringify(character.inventory || []),
+    inventory: JSON.stringify(sanitizeInventory(character.inventory)),
     equipment: JSON.stringify(character.equipment || createDefaultEquipment()),
+    potionEffects: JSON.stringify(character.potionEffects || []),
     quests: JSON.stringify(character.quests || []),
     dailyquests: JSON.stringify(character.dailyQuests || []),
     queststats: JSON.stringify(character.questStats || null),
@@ -422,9 +459,9 @@ function serializeCharacter(character) {
 function deserializeCharacter(row) {
   if (!row) return null;
 
-  const inventory = Array.isArray(row.inventory)
+  const inventory = sanitizeInventory(Array.isArray(row.inventory)
     ? row.inventory
-    : (typeof row.inventory === 'string' ? JSON.parse(row.inventory || '[]') : []);
+    : (typeof row.inventory === 'string' ? JSON.parse(row.inventory || '[]') : []));
 
   const quests = Array.isArray(row.quests)
     ? row.quests
@@ -453,6 +490,14 @@ function deserializeCharacter(row) {
   for (const slot of EQUIPMENT_SLOTS) {
     if (!(slot in equipment)) equipment[slot] = null;
   }
+  let potionEffects = row.potioneffects;
+  if (typeof potionEffects === 'string') {
+    try {
+      potionEffects = JSON.parse(potionEffects || '[]');
+    } catch {
+      potionEffects = [];
+    }
+  }
 
   return {
     id: row.id,
@@ -468,10 +513,13 @@ function deserializeCharacter(row) {
     agi: row.agi,
     int: row.int,
     gold: row.gold,
+    mana: row.mana ?? 100,
+    maxMana: row.maxmana ?? 100,
     location: row.location,
     kills: row.kills,
     inventory,
     equipment,
+    potionEffects: Array.isArray(potionEffects) ? potionEffects : [],
     quests,
     dailyQuests,
     questStats,
@@ -499,10 +547,13 @@ async function initDatabase() {
     'agi INTEGER',
     'int INTEGER',
     'gold INTEGER',
+    'mana INTEGER DEFAULT 100',
+    'maxmana INTEGER DEFAULT 100',
     'location TEXT',
     'kills INTEGER',
     'inventory TEXT',
     'equipment TEXT',
+    "potioneffects TEXT DEFAULT '[]'",
     'quests TEXT',
     'dailyquests TEXT',
     'queststats TEXT',
@@ -533,10 +584,13 @@ async function initDatabase() {
       agi INTEGER,
       int INTEGER,
       gold INTEGER,
+      mana INTEGER DEFAULT 100,
+      maxmana INTEGER DEFAULT 100,
       location TEXT,
       kills INTEGER,
       inventory TEXT,
       equipment TEXT,
+      potioneffects TEXT DEFAULT '[]',
       quests TEXT,
       dailyquests TEXT,
       queststats TEXT,
@@ -561,8 +615,8 @@ async function saveCharacter(character) {
   const row = serializeCharacter(character);
   await pool.query(
     `INSERT INTO characters (
-      id, name, classid, faction, level, xp, xptonext, maxhp, hp, str, agi, int, gold, location, kills, inventory, equipment, quests, dailyquests, queststats, passwordhash, createdat
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+      id, name, classid, faction, level, xp, xptonext, maxhp, hp, str, agi, int, gold, mana, maxmana, location, kills, inventory, equipment, potioneffects, quests, dailyquests, queststats, passwordhash, createdat
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
       classid = EXCLUDED.classid,
@@ -576,10 +630,13 @@ async function saveCharacter(character) {
       agi = EXCLUDED.agi,
       int = EXCLUDED.int,
       gold = EXCLUDED.gold,
+      mana = EXCLUDED.mana,
+      maxmana = EXCLUDED.maxmana,
       location = EXCLUDED.location,
       kills = EXCLUDED.kills,
       inventory = EXCLUDED.inventory,
       equipment = EXCLUDED.equipment,
+      potioneffects = EXCLUDED.potioneffects,
       quests = EXCLUDED.quests,
       dailyquests = EXCLUDED.dailyquests,
       queststats = EXCLUDED.queststats,
@@ -599,10 +656,13 @@ async function saveCharacter(character) {
       row.agi,
       row.int,
       row.gold,
+      row.mana,
+      row.maxMana,
       row.location,
       row.kills,
       row.inventory,
       row.equipment,
+      row.potionEffects,
       row.quests,
       row.dailyquests,
       row.queststats,
@@ -619,12 +679,18 @@ async function listCharacters() {
 
 async function loadCharacterById(id) {
   const result = await pool.query('SELECT * FROM characters WHERE id = $1', [id]);
-  return deserializeCharacter(result.rows[0]);
+  const row = result.rows[0];
+  const character = deserializeCharacter(row);
+  if (character && hasLegacyInventoryItems(row)) await saveCharacter(character);
+  return character;
 }
 
 async function loadCharacterByName(name) {
   const result = await pool.query('SELECT * FROM characters WHERE name = $1', [name]);
-  return deserializeCharacter(result.rows[0]);
+  const row = result.rows[0];
+  const character = deserializeCharacter(row);
+  if (character && hasLegacyInventoryItems(row)) await saveCharacter(character);
+  return character;
 }
 
 const app = express();
@@ -745,10 +811,11 @@ app.post('/api/fight', async (req, res) => {
   const monster = { ...MONSTERS[monsterId] };
   const log = [];
   const equipmentBonuses = getEquipmentBonuses(char.equipment);
+  const potionBonuses = getActivePotionBonuses(char);
   const effectiveMaxHp = char.maxHp + equipmentBonuses.maxHp;
 
   while (char.hp > 0 && monster.hp > 0) {
-    const playerRoll = randInt(1, 6) + char.str + equipmentBonuses.str + Math.floor(char.level / 2);
+    const playerRoll = randInt(1, 6) + char.str + equipmentBonuses.str + potionBonuses.str + Math.floor(char.level / 2);
     const monsterRoll = randInt(1, 6) + Math.max(0, monster.def);
     const damage = Math.max(1, playerRoll - monsterRoll);
 
@@ -757,7 +824,8 @@ app.post('/api/fight', async (req, res) => {
 
     if (monster.hp <= 0) break;
 
-    const monsterDamage = Math.max(1, monster.atk + randInt(0, 3) - Math.floor((char.agi + equipmentBonuses.agi) / 3));
+    const baseMonsterDamage = Math.max(1, monster.atk + randInt(0, 3) - Math.floor((char.agi + equipmentBonuses.agi) / 3));
+    const monsterDamage = calculateDamageAfterArmor(baseMonsterDamage, potionBonuses.armor);
     char.hp -= monsterDamage;
     log.push(`${monster.name} наносит ${monsterDamage} урона ${char.name}.`);
   }
@@ -783,7 +851,7 @@ app.post('/api/fight', async (req, res) => {
     }
 
     if (Math.random() < 0.6) {
-      const loot = { id: 'potion', name: 'Зелье лечения', qty: 1, heal: 15 };
+      const loot = { id: 'potion_health', name: POTIONS.potion_health.name, effect: POTIONS.potion_health.effect, qty: 1 };
       const existing = char.inventory.find((item) => item.id === loot.id);
       if (existing) {
         existing.qty += loot.qty;
@@ -972,7 +1040,7 @@ app.post('/api/fight/attack', async (req, res) => {
   const log = [];
 
   const crit = Math.random() < 0.1;
-  const base = randInt(1, 6) + char.str + bonuses.str + Math.floor(char.level / 2);
+  const base = randInt(1, 6) + char.str + bonuses.str + getActivePotionBonuses(char).str + Math.floor(char.level / 2);
   const damage = Math.max(1, (crit ? base * 2 : base) - target.def);
   target.hp = Math.max(0, target.hp - damage);
   log.push(crit
@@ -992,10 +1060,11 @@ app.post('/api/fight/attack', async (req, res) => {
 
   for (const enemy of session.enemies.filter((e) => e.hp > 0)) {
     const baseDamage = enemy.atk + randInt(0, 3) - Math.floor((char.agi + bonuses.agi) / 3);
-    const hit = calculateDamageAfterArmor(baseDamage, bonuses.armor);
+    const armor = bonuses.armor + getActivePotionBonuses(char).armor;
+    const hit = calculateDamageAfterArmor(baseDamage, armor);
     char.hp = Math.max(0, char.hp - hit);
     const prevented = Math.max(0, baseDamage - hit);
-    log.push(`${enemy.name} атаковал вас на ${hit} урона${bonuses.armor ? ` (защита: ${bonuses.armor}, снижено на ${prevented})` : ''}`);
+    log.push(`${enemy.name} атаковал вас на ${hit} урона${armor ? ` (защита: ${armor}, снижено на ${prevented})` : ''}`);
     if (char.hp <= 0) break;
   }
 
@@ -1139,7 +1208,10 @@ app.get('/api/inventory', async (req, res) => {
   const id = req.query.id;
   const char = await loadCharacterById(id);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
-  res.json({ inventory: char.inventory });
+  const equippedIds = new Set(Object.values(char.equipment || {}).filter(Boolean).map((item) => item.id));
+  res.json({
+    inventory: char.inventory.filter((item) => item.slot && EQUIPMENT_SLOTS.includes(item.slot) && !equippedIds.has(item.id))
+  });
 });
 
 app.post('/api/useItem', async (req, res) => {
@@ -1150,16 +1222,37 @@ app.post('/api/useItem', async (req, res) => {
   const item = char.inventory[idx];
   if (!item) return res.status(400).json({ error: 'Предмет не найден.' });
 
-  if (item.id === 'potion' || item.id === 'food') {
-    const healed = item.heal || 10;
-    char.hp = Math.min(char.maxHp + getEquipmentBonuses(char.equipment).maxHp, char.hp + healed);
-    item.qty -= 1;
-    if (item.qty <= 0) char.inventory.splice(idx, 1);
-    await saveCharacter(char);
-    return res.json({ message: `Использован ${item.name}. Восстановлено ${healed} HP.`, character: stripPassword(withEquipmentBonuses(char)) });
+  return res.status(400).json({ error: 'Этот предмет нельзя использовать.' });
+});
+
+app.post('/api/usePotion', async (req, res) => {
+  const { id, potionId } = req.body;
+  const potion = POTIONS[potionId];
+  if (!id || !potion) return res.status(400).json({ error: 'Неизвестное зелье.' });
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
+
+  const index = char.inventory.findIndex((item) => item.id === potionId && item.qty > 0);
+  if (index < 0) return res.status(400).json({ error: 'Этого зелья нет в инвентаре.' });
+
+  const [item] = char.inventory.splice(index, 1);
+  if (item.qty > 1) char.inventory.push({ ...item, qty: item.qty - 1 });
+  if (potion.type === 'health') {
+    const maxHp = char.maxHp + getEquipmentBonuses(char.equipment).maxHp;
+    char.hp = Math.min(maxHp, char.hp + 50);
+  } else if (potion.type === 'mana') {
+    char.mana = Math.min(char.maxMana, char.mana + 30);
+  } else {
+    char.potionEffects = (char.potionEffects || []).filter((effect) => effect.expiresAt > Date.now());
+    char.potionEffects.push({
+      type: potion.type,
+      value: potion.type === 'strength' ? 5 : 10,
+      expiresAt: Date.now() + 10_000
+    });
   }
 
-  return res.status(400).json({ error: '��тот предмет нельзя использовать.' });
+  await saveCharacter(char);
+  res.json({ message: `Использовано: ${potion.name} (${potion.effect}).`, character: stripPassword(withEquipmentBonuses(char)) });
 });
 
 app.get('/api/quests', async (req, res) => {
@@ -1245,13 +1338,14 @@ app.post('/api/buyPotion', async (req, res) => {
   if (char.gold < 10) return res.status(400).json({ error: 'Недостаточно золота.' });
 
   char.gold -= 10;
-  const existing = char.inventory.find((item) => item.id === 'potion');
+  const potionId = POTIONS[req.body.potionId] ? req.body.potionId : 'potion_health';
+  const existing = char.inventory.find((item) => item.id === potionId);
   if (existing) existing.qty += 1;
-  else char.inventory.push({ id: 'potion', name: 'Зелье лечения', qty: 1, heal: 15 });
+  else char.inventory.push({ id: potionId, name: POTIONS[potionId].name, effect: POTIONS[potionId].effect, qty: 1 });
 
   addDailyQuestProgress(char, 'purchase_items');
   await saveCharacter(char);
-  res.json({ message: 'Куплено зелье лечения.', character: stripPassword(withEquipmentBonuses(char)) });
+  res.json({ message: `Куплено: ${POTIONS[potionId].name}.`, character: stripPassword(withEquipmentBonuses(char)) });
 });
 
 app.post('/api/buyEquipment', async (req, res) => {

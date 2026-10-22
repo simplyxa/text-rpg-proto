@@ -689,8 +689,8 @@ select option {
 }
 
 .inventory-equipment-icon {
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   margin-right: 5px;
   vertical-align: middle;
 }
@@ -892,6 +892,21 @@ select option {
   box-shadow: 0 0 16px var(--neon-glow);
 }
 
+.inventory-item-row {
+  border-color: #00ffff;
+}
+
+.inventory-equip-button,
+.potion-use-button {
+  background: #7c3aed;
+}
+
+.inventory-empty {
+  padding: 16px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 .gear-description,
 .equipped-details {
   display: flex;
@@ -911,6 +926,52 @@ select option {
   min-height: 1.5em;
   color: var(--accent-neon);
   text-align: center;
+}
+
+.potions-section {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #7c3aed;
+  border-radius: 12px;
+}
+
+.potions-section h2,
+.character-equipment h2 {
+  margin-top: 0;
+}
+
+.potions-list {
+  display: grid;
+  gap: 10px;
+}
+
+.potion-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid #00ffff;
+  border-radius: 10px;
+  background: var(--surface-bg);
+}
+
+.potion-card img {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+}
+
+.potion-details {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.potion-details span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
 }
 
 .gear-nav {

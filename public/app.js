@@ -85,6 +85,20 @@ const RARITY_NAMES = {
 const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', maxHp: 'Макс. HP', armor: 'Защита' };
 const EQUIPMENT_ARMOR = { helmet: 2, ring: 1, chest: 5, hands: 1, armor: 2, boots: 1, shield: 3, cloak: 0 };
 const SHOP_ITEM_ARMOR = { Шлем: 2, Амулет: 1, Броня: 5, Перчатки: 1, Штаны: 2, Сапоги: 1, 'Левый клинок': 0, 'Правый клинок': 3 };
+const POTIONS = {
+  potion_health: { name: 'Зелье Здоровья', effect: '+50 HP', icon: 'potion-health.svg' },
+  potion_mana: { name: 'Зелье Маны', effect: '+30 Mana', icon: 'potion-mana.svg' },
+  potion_strength: { name: 'Зелье Усиления', effect: '+5 Урона на 10 сек', icon: 'potion-strength.svg' },
+  potion_armor: { name: 'Зелье Защиты', effect: '+10 Защиты на 10 сек', icon: 'potion-armor.svg' }
+};
+
+function cleanInventory(inventory = []) {
+  return inventory
+    .filter((item) => item?.id !== 'food' && item?.name !== 'Пирожок')
+    .map((item) => item?.id === 'potion'
+      ? { ...item, id: 'potion_health', name: POTIONS.potion_health.name, heal: 50 }
+      : item);
+}
 
 const CLASS_SKILLS = {
   warrior: {
@@ -212,6 +226,7 @@ function applyCharacterBonuses(character) {
 
 function saveSessionState() {
   if (currentId && currentCharacter) {
+    currentCharacter.inventory = cleanInventory(currentCharacter.inventory);
     localStorage.setItem(STORAGE_ID_KEY, String(currentId));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCharacter));
     window.updateExperienceBar?.(currentCharacter.xp, currentCharacter.xpToNext, currentCharacter.level);
@@ -250,7 +265,11 @@ function restoreSessionState() {
     }
 
     currentId = savedId;
-    currentCharacter = applyCharacterBonuses({ ...parsed, faction: parsed.faction || 'light' });
+    currentCharacter = applyCharacterBonuses({
+      ...parsed,
+      faction: parsed.faction || 'light',
+      inventory: cleanInventory(parsed.inventory)
+    });
     return true;
   } catch {
     clearSessionState();
@@ -348,6 +367,7 @@ function renderCharacter(c) {
     <p>${passive.description}</p>
     <p><strong>Уровень:</strong> ${safeC.level}</p>
     <p><strong>HP:</strong> ${safeC.hp}/${safeC.maxHp}</p>
+    <p><strong>Мана:</strong> ${safeC.mana ?? 100}/${safeC.maxMana ?? 100}</p>
     <p><strong>Сила:</strong> ${safeC.str}</p>
     <p><strong>Ловкость:</strong> ${safeC.agi}</p>
     <p><strong>Интеллект:</strong> ${safeC.int}</p>
@@ -355,6 +375,7 @@ function renderCharacter(c) {
     <p class="armor-stat"><strong>Защита:</strong> ${safeC.armor || 0}</p>
     <p><strong>Золото:</strong> ${safeC.gold}</p>
     <p><strong>Локация:</strong> ${safeC.location}</p>
+    <div id="profilePotions"></div>
 
     <div class="skill-box">
       <div class="skill-tag">Навык: ${skill.name}</div>
@@ -381,6 +402,7 @@ function renderCharacter(c) {
     <button id="saveClassBtn" class="secondary-btn" type="button">Сохранить</button>
     <button id="logoutBtn" class="secondary-btn" type="button">Выйти</button>
   `;
+  renderPotions(safeC);
 
   const classSelect = document.getElementById('classSelect');
   const factionSelect = document.getElementById('factionSelect');
@@ -412,6 +434,66 @@ function renderCharacter(c) {
 
   gameStatus.textContent = `Игрок: ${safeC.name} • ${factionName} • ${className} • Уровень ${safeC.level}`;
   showGameScreen();
+}
+
+function renderPotions(character) {
+  const section = document.createElement('section');
+  section.className = 'potions-section';
+  const heading = document.createElement('h3');
+  heading.textContent = 'Зелья';
+  const list = document.createElement('div');
+  list.className = 'potions-list';
+  section.append(heading, list);
+
+  const potions = cleanInventory(character.inventory).filter((item) => POTIONS[item.id] && Number(item.qty) > 0);
+  if (!potions.length) {
+    const empty = document.createElement('p');
+    empty.textContent = 'Нет зелий.';
+    list.append(empty);
+  }
+  potions.forEach((item) => {
+    const potion = POTIONS[item.id];
+    const card = document.createElement('article');
+    card.className = 'potion-card';
+    const icon = document.createElement('img');
+    icon.src = `/images/potions/${potion.icon}`;
+    icon.alt = '';
+    icon.setAttribute('aria-hidden', 'true');
+    const details = document.createElement('div');
+    details.className = 'potion-details';
+    const name = document.createElement('strong');
+    name.textContent = potion.name;
+    const effect = document.createElement('span');
+    effect.textContent = potion.effect;
+    const quantity = document.createElement('span');
+    quantity.textContent = `Количество: ${item.qty}`;
+    details.append(name, effect, quantity);
+    const button = document.createElement('button');
+    button.className = 'small-btn potion-use-button';
+    button.type = 'button';
+    button.textContent = 'Использовать';
+    button.addEventListener('click', () => usePotion(item.id));
+    card.append(icon, details, button);
+    list.append(card);
+  });
+  document.getElementById('profilePotions')?.replaceChildren(section);
+}
+
+async function usePotion(potionId) {
+  const res = await api('/api/usePotion', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: currentId, potionId })
+  });
+  if (res.error) return alert(res.error);
+  currentCharacter = applyCharacterBonuses({
+    ...res.character,
+    inventory: cleanInventory(res.character.inventory),
+    faction: currentCharacter.faction || 'light'
+  });
+  saveSessionState();
+  renderCharacter(currentCharacter);
+  setLog(res.message || 'Зелье использовано.');
 }
 
 function renderCharacterList(list) {
@@ -593,49 +675,30 @@ async function renderInventoryTab() {
     return;
   }
 
-  if (!res.inventory || res.inventory.length === 0) {
-    inventoryContent.innerHTML = '<p>Инвентарь пуст.</p>';
+  const items = (res.inventory || []).filter((item) => item.slot && EQUIPMENT_SLOTS.some((slot) => slot.id === item.slot));
+  if (!items.length) {
+    inventoryContent.innerHTML = '<p>Нет ненадетого снаряжения.</p>';
     return;
   }
 
-  inventoryContent.innerHTML = res.inventory.map((item, idx) => {
+  inventoryContent.innerHTML = items.map((item, idx) => {
     const slot = EQUIPMENT_SLOTS.find((candidate) => candidate.id === item.slot);
     const armor = itemArmor(item);
     return `
       <div class="item-row">
         <div class="item-name${slot ? ` rarity-${escapeHtml(item.rarity || 'common')}` : ''}"${slot ? ` title="${escapeHtml(formatStatBonuses(item.statBonus))}"` : ''}>
           ${slot ? `<svg class="equipment-icon inventory-equipment-icon" aria-hidden="true"><use href="/equipment-icons.svg#${slot.id}"></use></svg><span>${slot.name} • </span>` : ''}
-          ${escapeHtml(item.name)}${slot ? ` • ${RARITY_NAMES[item.rarity] || escapeHtml(item.rarity)} • Защита: +${armor}` : ` x${item.qty}`}
+          ${escapeHtml(item.name)} • ${RARITY_NAMES[item.rarity] || escapeHtml(item.rarity)} • Защита: +${armor} • Урон: +${Number(item.statBonus?.str) || 0}
         </div>
-        ${slot
-          ? `<button class="small-btn" data-equip-inventory="${idx}" type="button">Надеть</button>`
-          : `<button class="small-btn" data-use-index="${idx}" type="button">Использовать</button>`}
+        <button class="small-btn inventory-equip-button" data-equip-inventory="${idx}" type="button">Надеть</button>
       </div>
     `;
   }).join('');
 
   inventoryContent.querySelectorAll('[data-equip-inventory]').forEach((btn) => {
     btn.onclick = async () => {
-      const item = res.inventory[Number(btn.dataset.equipInventory)];
+      const item = items[Number(btn.dataset.equipInventory)];
       await changeEquipment('/api/equipItem', { slot: item.slot, itemId: item.id }, item.slot);
-    };
-  });
-
-  inventoryContent.querySelectorAll('[data-use-index]').forEach((btn) => {
-    btn.onclick = async () => {
-      const idx = Number(btn.dataset.useIndex);
-      const useRes = await api('/api/useItem', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: currentId, idx })
-      });
-
-      if (useRes.error) return alert(useRes.error);
-      setLog(useRes.message || 'Предмет использован');
-      currentCharacter = applyCharacterBonuses({ ...useRes.character, faction: currentCharacter.faction || 'light' });
-      saveSessionState();
-      renderCharacter(currentCharacter);
-      renderInventoryTab();
     };
   });
 }
@@ -802,28 +865,29 @@ async function renderShopTab() {
     return;
   }
 
-  shopContent.innerHTML = `
+  shopContent.innerHTML = Object.entries(POTIONS).map(([potionId, potion]) => `
     <div class="shop-row">
-      <div class="shop-name"><strong>Зелье лечения</strong><br>Восстанавливает 15 HP</div>
-      <button class="small-btn" id="buyPotionBtn">Купить за 10 золота</button>
+      <div class="shop-name"><strong>${potion.name}</strong><br>${potion.effect}</div>
+      <button class="small-btn" data-buy-potion="${potionId}" type="button">Купить за 10 золота</button>
     </div>
-  `;
+  `).join('');
 
-  document.getElementById('buyPotionBtn').onclick = async () => {
-    const res = await api('/api/buyPotion', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: currentId })
-    });
+  shopContent.querySelectorAll('[data-buy-potion]').forEach((button) => {
+    button.onclick = async () => {
+      const res = await api('/api/buyPotion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentId, potionId: button.dataset.buyPotion })
+      });
 
-    if (res.error) return alert(res.error);
-    setLog(res.message || 'Покупка совершена.');
-    currentCharacter = applyCharacterBonuses({ ...res.character, faction: currentCharacter.faction || 'light' });
-    saveSessionState();
-    renderCharacter(currentCharacter);
-    renderShopTab();
-    renderInventoryTab();
-  };
+      if (res.error) return alert(res.error);
+      setLog(res.message || 'Покупка совершена.');
+      currentCharacter = applyCharacterBonuses({ ...res.character, faction: currentCharacter.faction || 'light' });
+      saveSessionState();
+      renderCharacter(currentCharacter);
+      renderShopTab();
+    };
+  });
 }
 
 async function loadWorld() {
