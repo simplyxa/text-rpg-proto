@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS characters (
   id TEXT PRIMARY KEY,
   name TEXT,
   classid TEXT,
+  faction TEXT DEFAULT 'light',
   level INTEGER,
   xp INTEGER,
   xptonext INTEGER,
@@ -14,12 +15,14 @@ CREATE TABLE IF NOT EXISTS characters (
   location TEXT,
   kills INTEGER,
   inventory TEXT,
+  equipment TEXT,
   quests TEXT,
   passwordhash TEXT,
   createdat BIGINT
 );
 
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS classid TEXT;
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS faction TEXT DEFAULT 'light';
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS level INTEGER;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS xp INTEGER;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS xptonext INTEGER;
@@ -32,6 +35,7 @@ ALTER TABLE characters ADD COLUMN IF NOT EXISTS gold INTEGER;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS location TEXT;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS kills INTEGER;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS inventory TEXT;
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS equipment TEXT;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS quests TEXT;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS passwordhash TEXT;
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS createdat BIGINT;

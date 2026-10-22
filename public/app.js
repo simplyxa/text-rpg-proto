@@ -32,6 +32,7 @@ const profileContent = document.getElementById('profileContent');
 const inventoryContent = document.getElementById('inventoryContent');
 const questsContent = document.getElementById('questsContent');
 const shopContent = document.getElementById('shopContent');
+const equipmentContent = document.getElementById('equipmentContent');
 
 const fightBtn = document.getElementById('fightBtn');
 const invBtn = document.getElementById('invBtn');
@@ -62,6 +63,26 @@ const FACTION_BONUSES = {
   light: { str: 1, agi: 1, int: 2, maxHp: 8, hp: 8 },
   dark: { str: 2, agi: 2, int: 0, maxHp: 6, hp: 6 }
 };
+
+const EQUIPMENT_SLOTS = [
+  { id: 'helmet', name: 'Шлем' },
+  { id: 'chest', name: 'Грудь' },
+  { id: 'shield', name: 'Щит' },
+  { id: 'hands', name: 'Руки' },
+  { id: 'armor', name: 'Доспех' },
+  { id: 'boots', name: 'Ботинки' },
+  { id: 'cloak', name: 'Плащ' },
+  { id: 'ring', name: 'Кольцо' }
+];
+
+const RARITY_NAMES = {
+  common: 'Обычный',
+  rare: 'Редкий',
+  epic: 'Эпический',
+  legendary: 'Легендарный'
+};
+
+const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', maxHp: 'Макс. HP' };
 
 const CLASS_SKILLS = {
   warrior: {
@@ -574,10 +595,19 @@ async function renderInventoryTab() {
 
   inventoryContent.innerHTML = res.inventory.map((item, idx) => `
     <div class="item-row">
-      <div class="item-name">${item.name} x${item.qty}</div>
-      <button class="small-btn" data-use-index="${idx}">Использовать</button>
+      <div class="item-name">${escapeHtml(item.name)}${item.slot ? ` • ${RARITY_NAMES[item.rarity] || escapeHtml(item.rarity)}` : ` x${item.qty}`}</div>
+      ${item.slot
+        ? '<button class="small-btn" data-open-equipment>Снаряжение</button>'
+        : `<button class="small-btn" data-use-index="${idx}">Использовать</button>`}
     </div>
   `).join('');
+
+  inventoryContent.querySelectorAll('[data-open-equipment]').forEach((btn) => {
+    btn.onclick = async () => {
+      setActiveTab('equipment');
+      await renderEquipmentTab();
+    };
+  });
 
   inventoryContent.querySelectorAll('[data-use-index]').forEach((btn) => {
     btn.onclick = async () => {
@@ -594,6 +624,95 @@ async function renderInventoryTab() {
       saveSessionState();
       renderCharacter(currentCharacter);
       renderInventoryTab();
+    };
+  });
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+}
+
+function formatStatBonuses(bonuses = {}) {
+  return Object.entries(STAT_NAMES)
+    .filter(([key]) => Number(bonuses[key]))
+    .map(([key, name]) => `${name} +${Number(bonuses[key])}`)
+    .join(' • ') || 'Без бонусов';
+}
+
+async function renderEquipmentTab() {
+  if (!currentId) {
+    equipmentContent.innerHTML = '<p>Сначала выберите героя.</p>';
+    return;
+  }
+
+  const res = await api(`/api/equipment?id=${encodeURIComponent(currentId)}`);
+  if (res.error) {
+    equipmentContent.innerHTML = `<p>${escapeHtml(res.error)}</p>`;
+    return;
+  }
+
+  const equipment = res.equipment || {};
+  const inventory = res.inventory || [];
+  equipmentContent.innerHTML = `
+    <div class="equipment-grid">
+      ${EQUIPMENT_SLOTS.map((slot) => {
+        const item = equipment[slot.id];
+        const options = inventory.filter((candidate) => candidate.slot === slot.id);
+        const rarity = item?.rarity || 'empty';
+        return `
+          <article class="equipment-slot">
+            <div class="equipment-slot-heading">
+              <svg class="equipment-icon" aria-hidden="true"><use href="/equipment-icons.svg#${slot.id}"></use></svg>
+              <strong>${slot.name}</strong>
+            </div>
+            ${item
+              ? `<div class="equipment-item rarity-${rarity}" title="${escapeHtml(formatStatBonuses(item.statBonus))}">
+                  <strong>${escapeHtml(item.name)}</strong>
+                  <span>${RARITY_NAMES[item.rarity] || escapeHtml(item.rarity)}</span>
+                  <small>${escapeHtml(formatStatBonuses(item.statBonus))}</small>
+                </div>
+                <button class="small-btn" data-unequip-slot="${slot.id}" type="button">Снять</button>`
+              : '<div class="equipment-empty">Пусто</div>'}
+            <button class="small-btn equipment-inventory-btn" data-toggle-inventory="${slot.id}" type="button">Инвентарь</button>
+            <div class="equipment-picker hidden" id="picker-${slot.id}">
+              ${options.length
+                ? `<select aria-label="Предмет для слота ${slot.name}" data-item-select="${slot.id}">
+                    ${options.map((option) => `<option value="${escapeHtml(option.id)}">${escapeHtml(option.name)} — ${RARITY_NAMES[option.rarity] || escapeHtml(option.rarity)}</option>`).join('')}
+                  </select>
+                  <button class="small-btn" data-equip-slot="${slot.id}" type="button">Надеть</button>`
+                : '<small>Нет подходящих предметов</small>'}
+            </div>
+          </article>
+        `;
+      }).join('')}
+    </div>
+    <div class="equipment-total">
+      <strong>Общие бонусы:</strong> ${escapeHtml(formatStatBonuses(res.bonuses))}
+    </div>
+  `;
+
+  equipmentContent.querySelectorAll('[data-toggle-inventory]').forEach((button) => {
+    button.onclick = () => document.getElementById(`picker-${button.dataset.toggleInventory}`).classList.toggle('hidden');
+  });
+
+  equipmentContent.querySelectorAll('[data-unequip-slot], [data-equip-slot]').forEach((button) => {
+    button.onclick = async () => {
+      const slot = button.dataset.unequipSlot || button.dataset.equipSlot;
+      const itemId = button.dataset.unequipSlot
+        ? null
+        : equipmentContent.querySelector(`[data-item-select="${slot}"]`).value;
+      const equipRes = await api('/api/equipItem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentId, slot, itemId })
+      });
+      if (equipRes.error) return alert(equipRes.error);
+      currentCharacter = applyCharacterBonuses({ ...equipRes.character, faction: currentCharacter.faction || 'light' });
+      saveSessionState();
+      renderCharacter(currentCharacter);
+      await renderEquipmentTab();
     };
   });
 }
@@ -700,6 +819,7 @@ tabButtons.forEach((btn) => {
     setActiveTab(name);
 
     if (name === 'inventory') await renderInventoryTab();
+    if (name === 'equipment') await renderEquipmentTab();
     if (name === 'quests') await renderQuestsTab();
     if (name === 'shop') await renderShopTab();
     if (name === 'profile') renderCharacter(currentCharacter);

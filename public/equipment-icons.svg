@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="helmet" viewBox="0 0 32 32">
+    <path d="M5 19a11 11 0 0 1 22 0v3H5z" fill="none" stroke="currentColor" stroke-width="2"/>
+    <path d="M9 19v-3a7 7 0 0 1 14 0v3M16 5v5M5 24h22" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"/>
+  </symbol>
+  <symbol id="chest" viewBox="0 0 32 32">
+    <path d="m10 5 6 3 6-3 5 4-2 18H7L5 9z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"/>
+    <path d="m16 8-3 6 3 3 3-3zM16 17v10" fill="none" stroke="currentColor" stroke-width="2"/>
+  </symbol>
+  <symbol id="shield" viewBox="0 0 32 32">
+    <path d="M16 3 27 7v8c0 7-5 11-11 14C10 26 5 22 5 15V7z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"/>
+    <path d="M16 5v21M8 10h16" fill="none" stroke="currentColor" stroke-width="2"/>
+  </symbol>
+  <symbol id="hands" viewBox="0 0 32 32">
+    <path d="M8 17V8a2 2 0 0 1 4 0v6-9a2 2 0 0 1 4 0v9-8a2 2 0 0 1 4 0v9-6a2 2 0 0 1 4 0v11l-5 7h-8l-5-7v-3a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"/>
+  </symbol>
+  <symbol id="armor" viewBox="0 0 32 32">
+    <path d="m10 4 6 3 6-3 6 5-3 19H7L4 9z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"/>
+    <path d="M16 7v21M7 16h18" fill="none" stroke="currentColor" stroke-width="2"/>
+  </symbol>
+  <symbol id="boots" viewBox="0 0 32 32">
+    <path d="M8 4h8v12l5 4 7 2v5H5v-5l3-4zM16 16h-8" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"/>
+  </symbol>
+  <symbol id="cloak" viewBox="0 0 32 32">
+    <path d="M11 6a5 5 0 0 1 10 0l6 22-11-5-11 5z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"/>
+    <path d="M11 6c0 4 2 6 5 7 3-1 5-3 5-7M16 13v10" fill="none" stroke="currentColor" stroke-width="2"/>
+  </symbol>
+  <symbol id="ring" viewBox="0 0 32 32">
+    <circle cx="16" cy="18" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+    <path d="m13 7 3-4 3 4-3 4zM13 27h6" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"/>
+  </symbol>
+</svg>
