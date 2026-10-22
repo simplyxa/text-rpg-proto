@@ -42,19 +42,9 @@ function renderCharacterPage() {
     <p><strong>Сила:</strong> ${character.str}</p>
     <p><strong>Ловкость:</strong> ${character.agi}</p>
     <p><strong>Интеллект:</strong> ${character.int}</p>
-    <p><strong>Опыт:</strong> ${character.xp}/${character.xpToNext}</p>
     <p><strong>Золото:</strong> ${character.gold}</p>
     <p><strong>Локация:</strong> ${character.location}</p>
   `;
-
-  document.getElementById('playBtn').onclick = () => {
-    window.location.href = '/';
-  };
-
-  document.getElementById('logoutBtn').onclick = () => {
-    clearSessionState();
-    window.location.href = '/';
-  };
 }
 
 renderCharacterPage();

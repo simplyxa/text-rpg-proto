@@ -884,7 +884,8 @@ async function restoreSession() {
 }
 
 const params = new URLSearchParams(window.location.search);
-const mode = params.get('mode');
+const pageModes = { '/inventory': 'inventory', '/equipment': 'equipment' };
+const mode = params.get('mode') || pageModes[window.location.pathname];
 
 if (mode === 'forest') {
   setActiveTab('profile');
@@ -896,7 +897,9 @@ if (mode === 'shop') {
 }
 if (mode === 'inventory') {
   setActiveTab('inventory');
-  renderInventoryTab();
+}
+if (mode === 'equipment') {
+  setActiveTab('equipment');
 }
 if (mode === 'quests') {
   setActiveTab('quests');
@@ -910,3 +913,5 @@ if (mode === 'profile') {
 loadWorld();
 loadCharacters();
 restoreSession();
+if (mode === 'inventory') renderInventoryTab();
+if (mode === 'equipment') renderEquipmentTab();
