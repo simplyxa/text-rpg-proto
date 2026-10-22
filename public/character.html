@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Персонаж — RPG World</title>
+  <title>Мой герой — War of Souls</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/css/items.css">
 </head>
@@ -13,26 +13,32 @@
     <span class="experience-percentage">0%</span>
   </div>
   <div class="page-shell">
-    <div class="panel character-page">
-      <div class="auth-header">
+    <main class="panel character-page">
+      <header class="auth-header">
         <span class="eyebrow">Профиль героя</span>
-        <h1 id="title">Загрузка...</h1>
-      </div>
+        <h1 id="title">Мой герой</h1>
+      </header>
 
-      <nav class="character-nav" aria-label="Навигация персонажа">
-        <a href="/inventory">Инвентарь</a>
-        <a href="/equipment">Снаряжение</a>
-        <a href="/enhancement">К усилению</a>
-        <a href="/towers-map">⚔️ Битва за Башню</a>
+      <section id="profileIdentity" class="profile-hero" aria-label="Герой"></section>
+
+      <nav class="character-nav profile-menu" aria-label="Разделы героя">
+        <a href="#" data-profile-placeholder="Достижения">Достижения <span>›</span></a>
+        <a href="#" data-profile-placeholder="Анкета">Анкета <span>›</span></a>
+        <a href="/equipment">Снаряжение <span>›</span></a>
+        <a href="#" data-profile-placeholder="Умения">Умения <span>›</span></a>
+        <a href="/inventory">Рюкзак <span>›</span></a>
+        <a href="#" data-profile-placeholder="Сундук">Сундук <span>›</span></a>
+        <a href="#" data-profile-placeholder="Витрина">Витрина <span>›</span></a>
+        <a href="#" data-profile-placeholder="Почта">Почта <span>›</span></a>
       </nav>
 
       <div id="characterCard" class="content-box"></div>
       <p id="profileMessage" class="gear-message" role="status" aria-live="polite"></p>
 
       <nav class="character-nav character-nav-bottom" aria-label="Навигация по миру">
-        <a href="/city">В город</a>
+        <a href="/city">В город <span>›</span></a>
       </nav>
-    </div>
+    </main>
   </div>
 
   <script src="/js/items.js"></script>
