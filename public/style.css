@@ -2239,3 +2239,27 @@ a.secondary-btn {
     align-items: center;
   }
 }
+
+.stats-frame {
+  background: #14110f;
+  border: 3px double #8a6d3b;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.7) inset;
+}
+.stats-resources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  justify-content: center;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid #5a4727;
+  border-radius: 6px;
+  font-weight: 700;
+}
+.stats-group h2 {
+  margin: 14px 0 6px;
+  font-size: 1rem;
+  color: #d9b46a;
+  border-bottom: 1px solid #5a4727;
+}
