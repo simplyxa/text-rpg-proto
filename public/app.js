@@ -362,9 +362,16 @@ function renderCharacter(c) {
   const logoutBtn = document.getElementById('logoutBtn');
 
   if (saveClassBtn) {
-    saveClassBtn.onclick = () => {
+    saveClassBtn.onclick = async () => {
       const nextClass = classSelect.value;
       const nextFaction = factionSelect.value;
+
+      const res = await api('/api/updateCharacter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentId, classId: nextClass, faction: nextFaction })
+      });
+      if (res.error) return alert(res.error);
 
       currentCharacter.classId = nextClass;
       currentCharacter.faction = nextFaction;
