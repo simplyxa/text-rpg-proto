@@ -1,0 +1,28 @@
+.towers-page { width: min(100%, 900px); padding: 24px; }
+.towers-layout { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+#towersCanvas { width: 100%; max-width: 500px; height: auto; border-radius: 12px; border: 2px solid #444; cursor: pointer; }
+.tower-info-box { flex: 1; min-width: 220px; }
+.towers-list, .towers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 16px 0; }
+.tower-card { padding: 12px; border-radius: 12px; border: 1px solid #555; transition: transform .2s, box-shadow .2s; }
+.tower-card:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0, 0, 0, .4); }
+.tower-card.union { background: linear-gradient(135deg, #1e2a55, #4169E1); }
+.tower-card.empire { background: linear-gradient(135deg, #55111f, #DC143C); }
+.tower-card-header { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.tower-icon { font-size: 1.8rem; }
+.tower-health { height: 10px; border-radius: 6px; background: rgba(0, 0, 0, .45); overflow: hidden; margin: 6px 0; }
+.tower-health-fill { height: 100%; transition: width .3s; }
+.tower-health-fill.union { background: #4169E1; box-shadow: 0 0 6px #4169E1; }
+.tower-health-fill.empire { background: #DC143C; box-shadow: 0 0 6px #DC143C; }
+.tower-actions { margin-top: 8px; }
+.tower-btn { width: 100%; }
+.faction-war-compare { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.faction-war-card { flex: 1; min-width: 200px; padding: 14px; border-radius: 12px; text-align: center; }
+.faction-war-card.union { border: 2px solid #4169E1; }
+.faction-war-card.empire { border: 2px solid #DC143C; }
+.faction-war-count { font-size: 1.4rem; font-weight: bold; }
+.war-columns { display: flex; flex-wrap: wrap; gap: 16px; }
+.war-columns > section { flex: 1; min-width: 240px; }
+.towers-message.error { color: #ff6b6b; }
+.towers-nav { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
+.towers-nav a { padding: 6px 12px; text-decoration: none; }
+@media (max-width: 600px) { .towers-page { padding: 12px; } }

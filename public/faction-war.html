@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Битва за Башню — Статистика войны</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/css/towers.css">
+</head>
+<body>
+  <div class="page-shell">
+    <main class="panel towers-page">
+      <header class="auth-header">
+        <span class="eyebrow">Союз против Империи</span>
+        <h1>📊 Статистика войны</h1>
+      </header>
+      <div id="factionComparison" class="faction-war-compare"></div>
+      <div class="war-columns">
+        <section><h2>Последние захваты</h2><ul id="recentCaptures"></ul></section>
+        <section><h2>Топ завоевателей</h2><ol id="topPlayers"></ol></section>
+        <section><h2>Моя статистика</h2><div id="personalStats"></div></section>
+      </div>
+      <h2>Все башни</h2>
+      <div id="towersGrid" class="towers-grid"></div>
+      <nav class="towers-nav" aria-label="Навигация">
+        <a href="/towers-map">Карта башен</a>
+        <a href="/character">На профиль</a>
+        <a href="/">Главное меню</a>
+      </nav>
+    </main>
+  </div>
+  <script src="/js/towers.js"></script>
+  <script>initFactionWar();</script>
+</body>
+</html>

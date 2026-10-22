@@ -1151,7 +1151,9 @@ const PAGES = {
   '/inventory': 'inventory.html',
   '/equipment': 'equipment.html',
   '/enhancement': 'enhancement.html',
-  '/shop': 'shop.html'
+  '/shop': 'shop.html',
+  '/towers-map': 'towers-map.html',
+  '/faction-war': 'faction-war.html'
 };
 for (const [route, file] of Object.entries(PAGES)) {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'public', file)));

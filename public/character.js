@@ -67,6 +67,8 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
     <p><strong>Ловкость:</strong> ${character.agi}</p>
     <p><strong>Интеллект:</strong> ${character.int}</p>
     <p><strong>Золото:</strong> ${character.gold}</p>
+    <p><strong>Фракция войны:</strong> ${TOWER_FACTIONS[getPlayerFaction(character)].name}</p>
+    <p><strong>Репутация:</strong> ${getPlayerStats(character).reputation}</p>
     <p><strong>Локация:</strong> ${character.location}</p>
     </section>
   `;
