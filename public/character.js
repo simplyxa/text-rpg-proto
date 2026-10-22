@@ -52,6 +52,19 @@ function renderCharacterPage() {
     <p><strong>Золото:</strong> ${character.gold}</p>
     <p><strong>Локация:</strong> ${character.location}</p>
   `;
+
+  const equippedItems = Object.values(character.equipment || {}).filter(Boolean);
+  if (equippedItems.length) {
+    const icons = document.createElement('div');
+    icons.className = 'equipped-icons';
+    equippedItems.forEach((item) => {
+      const icon = createItemIcon(item, 'inventory');
+      if (!icon) return;
+      icon.title = item.name;
+      icons.append(icon);
+    });
+    characterCard.append(icons);
+  }
 }
 
 renderCharacterPage();

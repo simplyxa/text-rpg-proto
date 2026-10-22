@@ -1,0 +1,51 @@
+.item-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  object-fit: contain;
+  vertical-align: middle;
+  filter: drop-shadow(0 0 4px rgba(124, 58, 237, 0.7));
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.item-icon-inventory { width: 32px; height: 32px; }
+.item-icon-shop { width: 40px; height: 40px; }
+.item-icon-equipment { width: 48px; height: 48px; }
+
+.item-icon:hover,
+.gear-row:hover .item-icon {
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 8px #00ffff);
+}
+
+.item-icon-new { animation: item-icon-pulse 1.5s ease-in-out infinite; }
+.item-icon-rare { animation: item-icon-glow 2.5s ease-in-out infinite; }
+.item-icon-epic,
+.item-icon-legendary { animation: item-icon-spin 6s linear infinite; }
+
+.gear-row-with-icon > .item-icon { margin-right: 4px; }
+
+@keyframes item-icon-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+@keyframes item-icon-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px #7c3aed); }
+  50% { filter: drop-shadow(0 0 10px #00ffff); }
+}
+
+@keyframes item-icon-spin {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item-icon { animation: none !important; transition: none; }
+}
+
+.equipped-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
