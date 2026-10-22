@@ -2102,3 +2102,107 @@ a.secondary-btn {
     transition-duration: 0.01ms !important;
   }
 }
+
+.equipment-screen {
+  width: min(100%, 520px);
+  padding: 16px;
+  border: 1px solid #806a43;
+  border-radius: 6px;
+  background: #1b1a18;
+}
+
+.equipment-title {
+  margin: 0 0 12px;
+  color: #e8d8b3;
+  font-family: 'Cinzel', serif;
+  font-size: 1.2rem;
+  text-align: center;
+  text-shadow: none;
+}
+
+.equipment-actions {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.equipment-action {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid #806a43;
+  border-radius: 4px;
+  background: linear-gradient(#3a3226, #25201a);
+  color: #ead59c;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.equipment-action:hover {
+  border-color: #bf9b5b;
+  background: linear-gradient(#483e2e, #2d261d);
+}
+
+.equipment-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 16px;
+  border: 1px solid rgba(191, 155, 91, 0.28);
+  background: #141311;
+}
+
+.equipment-portrait {
+  display: grid;
+  width: 120px;
+  height: 150px;
+  place-items: center;
+  border: 2px solid #806a43;
+  border-radius: 6px;
+  background: radial-gradient(circle at 50% 30%, #66543b, #1f1a14 75%);
+  color: #ead59c;
+  font-family: 'Cinzel', serif;
+  font-size: 3.5rem;
+}
+
+.equipment-hero .equipment-total {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.equipment-items {
+  gap: 0;
+}
+
+.equipment-items .gear-row {
+  justify-content: flex-start;
+  border-width: 0 0 1px;
+  border-color: rgba(191, 155, 91, 0.28);
+  border-radius: 0;
+  background: transparent;
+}
+
+.equipment-items .gear-row:hover {
+  box-shadow: none;
+  background: rgba(191, 155, 91, 0.08);
+}
+
+.equipment-items .equipped-details {
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .equipment-items .gear-row {
+    flex-direction: row;
+    align-items: center;
+  }
+}

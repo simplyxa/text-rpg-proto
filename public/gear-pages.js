@@ -113,28 +113,27 @@ function createGearRow(name, rarity, details = '', item = null) {
 
 function renderEquipmentPage() {
   document.getElementById('equipmentTotal').textContent = `Общая защита: ${Number(character.armor) || Object.values(character.equipment || {}).reduce((total, item) => total + itemArmor(item), 0)}`;
+  const portrait = document.getElementById('equipmentPortrait');
+  portrait.textContent = (character.name || '?').trim().charAt(0).toUpperCase() || '?';
+  portrait.setAttribute('aria-label', `Персонаж ${character.name || ''}`.trim());
   const container = document.getElementById('equipmentList');
   container.replaceChildren();
   PAGE_SLOTS.forEach(({ id, name }) => {
     const item = character.equipment?.[id];
     const row = createGearRow(name, undefined, '', item);
     row.classList.add('equipment-page-slot');
+    row.querySelector('.gear-description')?.remove();
+    const itemDetails = document.createElement('div');
+    itemDetails.className = 'equipped-details';
+    const itemName = document.createElement('strong');
     if (item) {
-      const itemDetails = document.createElement('div');
-      itemDetails.className = 'equipped-details';
-      const itemName = document.createElement('strong');
       itemName.className = `rarity-${item.rarity || 'common'}`;
       itemName.textContent = item.name;
       const enhancement = Math.min(10, Math.max(0, Math.floor(Number(item.enhancement) || 0)));
-      const enhancementLabel = document.createElement('span');
-      enhancementLabel.className = `enhancement-level${enhancement >= 5 ? ' enhancement-high' : ''}`;
-      enhancementLabel.textContent = `+${enhancement}`;
-      const rarity = document.createElement('span');
-      rarity.textContent = rarityName(item.rarity);
-      const armor = document.createElement('span');
-      armor.className = 'armor-bonus';
-      armor.textContent = `Защита: +${enhancedStat(itemArmor(item), enhancement).toFixed(1).replace(/\.0$/, '')}`;
-      itemDetails.append(itemName, enhancementLabel, rarity, armor);
+      const stats = document.createElement('span');
+      stats.className = 'armor-bonus';
+      stats.textContent = `Ур. ${enhancement} • Защита: +${enhancedStat(itemArmor(item), enhancement).toFixed(1).replace(/\.0$/, '')}`;
+      itemDetails.append(itemName, stats);
       row.append(itemDetails);
 
       const button = document.createElement('button');
@@ -144,10 +143,12 @@ function renderEquipmentPage() {
       button.addEventListener('click', () => unequipItem(id));
       row.append(button);
     } else {
+      itemName.textContent = name;
       const empty = document.createElement('span');
       empty.className = 'equipment-empty';
       empty.textContent = 'Пусто';
-      row.append(empty);
+      itemDetails.append(itemName, empty);
+      row.append(itemDetails);
     }
     container.append(row);
   });
@@ -291,6 +292,8 @@ async function buyEquipmentSet() {
     showMessage(error.message);
   }
 }
+
+document.getElementById('repairAllButton')?.addEventListener('click', () => showMessage('Все вещи в отличном состоянии.'));
 
 const pageLoaders = {
   equipment: loadEquipmentPage,

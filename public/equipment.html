@@ -9,13 +9,17 @@
 </head>
 <body data-page="equipment">
   <div class="page-shell">
-    <main class="panel gear-page">
-      <header class="auth-header">
-        <span class="eyebrow">Экипировка героя</span>
-        <h1>Снаряжение</h1>
-      </header>
-      <p id="equipmentTotal" class="equipment-total armor-stat">Общая защита: 0</p>
-      <div id="equipmentList" class="gear-list"></div>
+    <main class="panel gear-page equipment-screen">
+      <h1 class="equipment-title">Моё снаряжение</h1>
+      <div class="equipment-actions">
+        <button type="button" id="repairAllButton" class="equipment-action">Починить все вещи <span>›</span></button>
+        <a href="/inventory" class="equipment-action">Открыть рюкзак <span>›</span></a>
+      </div>
+      <div class="equipment-hero">
+        <div id="equipmentPortrait" class="equipment-portrait" role="img" aria-label="Персонаж">?</div>
+        <p id="equipmentTotal" class="equipment-total armor-stat">Общая защита: 0</p>
+      </div>
+      <div id="equipmentList" class="gear-list equipment-items"></div>
       <p id="pageMessage" class="gear-message" role="status" aria-live="polite"></p>
       <nav class="gear-nav" aria-label="Навигация">
         <a href="/character">В профиль</a>
