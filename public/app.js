@@ -593,19 +593,25 @@ async function renderInventoryTab() {
     return;
   }
 
-  inventoryContent.innerHTML = res.inventory.map((item, idx) => `
-    <div class="item-row">
-      <div class="item-name">${escapeHtml(item.name)}${item.slot ? ` • ${RARITY_NAMES[item.rarity] || escapeHtml(item.rarity)}` : ` x${item.qty}`}</div>
-      ${item.slot
-        ? '<button class="small-btn" data-open-equipment>Снаряжение</button>'
-        : `<button class="small-btn" data-use-index="${idx}">Использовать</button>`}
-    </div>
-  `).join('');
+  inventoryContent.innerHTML = res.inventory.map((item, idx) => {
+    const slot = EQUIPMENT_SLOTS.find((candidate) => candidate.id === item.slot);
+    return `
+      <div class="item-row">
+        <div class="item-name${slot ? ` rarity-${escapeHtml(item.rarity || 'common')}` : ''}"${slot ? ` title="${escapeHtml(formatStatBonuses(item.statBonus))}"` : ''}>
+          ${slot ? `<svg class="equipment-icon inventory-equipment-icon" aria-hidden="true"><use href="/equipment-icons.svg#${slot.id}"></use></svg><span>${slot.name} • </span>` : ''}
+          ${escapeHtml(item.name)}${slot ? ` • ${RARITY_NAMES[item.rarity] || escapeHtml(item.rarity)}` : ` x${item.qty}`}
+        </div>
+        ${slot
+          ? `<button class="small-btn" data-equip-inventory="${idx}" type="button">Надеть</button>`
+          : `<button class="small-btn" data-use-index="${idx}" type="button">Использовать</button>`}
+      </div>
+    `;
+  }).join('');
 
-  inventoryContent.querySelectorAll('[data-open-equipment]').forEach((btn) => {
+  inventoryContent.querySelectorAll('[data-equip-inventory]').forEach((btn) => {
     btn.onclick = async () => {
-      setActiveTab('equipment');
-      await renderEquipmentTab();
+      const item = res.inventory[Number(btn.dataset.equipInventory)];
+      await changeEquipment('/api/equipItem', { slot: item.slot, itemId: item.id }, item.slot);
     };
   });
 
@@ -641,6 +647,45 @@ function formatStatBonuses(bonuses = {}) {
     .join(' • ') || 'Без бонусов';
 }
 
+function formatStatChanges(previous, next) {
+  return Object.entries(STAT_NAMES)
+    .map(([key, name]) => {
+      const change = Number(next[key]) - Number(previous[key]);
+      return change ? `${name} ${change > 0 ? '+' : ''}${change}` : null;
+    })
+    .filter(Boolean)
+    .join(' • ');
+}
+
+async function changeEquipment(endpoint, body, slot) {
+  const previousCharacter = currentCharacter;
+  const res = await api(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: currentId, ...body })
+  });
+  if (res.error) return alert(res.error);
+
+  const character = res.character;
+  currentCharacter = applyCharacterBonuses({
+    ...character,
+    baseStats: {
+      str: character.str,
+      agi: character.agi,
+      int: character.int,
+      maxHp: character.maxHp,
+      hp: character.hp
+    },
+    faction: currentCharacter.faction || 'light'
+  });
+  const changes = formatStatChanges(previousCharacter, currentCharacter);
+  saveSessionState();
+  renderCharacter(currentCharacter);
+  await Promise.all([renderInventoryTab(), renderEquipmentTab()]);
+  equipmentContent.querySelector(`[data-equipment-slot="${slot}"]`)?.classList.add('equipment-success');
+  setLog(`${res.message || 'Снаряжение обновлено.'}${changes ? ` Изменения: ${changes}.` : ''}`);
+}
+
 async function renderEquipmentTab() {
   if (!currentId) {
     equipmentContent.innerHTML = '<p>Сначала выберите героя.</p>';
@@ -662,7 +707,7 @@ async function renderEquipmentTab() {
         const options = inventory.filter((candidate) => candidate.slot === slot.id);
         const rarity = item?.rarity || 'empty';
         return `
-          <article class="equipment-slot">
+          <article class="equipment-slot" data-equipment-slot="${slot.id}">
             <div class="equipment-slot-heading">
               <svg class="equipment-icon" aria-hidden="true"><use href="/equipment-icons.svg#${slot.id}"></use></svg>
               <strong>${slot.name}</strong>
@@ -700,19 +745,12 @@ async function renderEquipmentTab() {
   equipmentContent.querySelectorAll('[data-unequip-slot], [data-equip-slot]').forEach((button) => {
     button.onclick = async () => {
       const slot = button.dataset.unequipSlot || button.dataset.equipSlot;
-      const itemId = button.dataset.unequipSlot
-        ? null
-        : equipmentContent.querySelector(`[data-item-select="${slot}"]`).value;
-      const equipRes = await api('/api/equipItem', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: currentId, slot, itemId })
-      });
-      if (equipRes.error) return alert(equipRes.error);
-      currentCharacter = applyCharacterBonuses({ ...equipRes.character, faction: currentCharacter.faction || 'light' });
-      saveSessionState();
-      renderCharacter(currentCharacter);
-      await renderEquipmentTab();
+      if (button.dataset.unequipSlot) {
+        await changeEquipment('/api/unequipItem', { slot }, slot);
+      } else {
+        const itemId = equipmentContent.querySelector(`[data-item-select="${slot}"]`).value;
+        await changeEquipment('/api/equipItem', { slot, itemId }, slot);
+      }
     };
   });
 }

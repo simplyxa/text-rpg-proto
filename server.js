@@ -631,24 +631,19 @@ app.get('/api/equipment', async (req, res) => {
 
 app.post('/api/equipItem', async (req, res) => {
   const { id, slot, itemId } = req.body;
-  if (!id || !EQUIPMENT_SLOTS.includes(slot)) {
+  if (!id || !itemId || !EQUIPMENT_SLOTS.includes(slot)) {
     return res.status(400).json({ error: 'Неверный персонаж или слот снаряжения.' });
   }
 
   const char = await loadCharacterById(id);
   if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
 
+  const inventoryIndex = char.inventory.findIndex((item) => item.id === itemId && item.slot === slot);
+  if (inventoryIndex < 0) return res.status(400).json({ error: 'Предмет не найден в инвентаре или не подходит для этого слота.' });
   const currentItem = char.equipment[slot];
-  if (itemId) {
-    const inventoryIndex = char.inventory.findIndex((item) => item.id === itemId && item.slot === slot);
-    if (inventoryIndex < 0) return res.status(400).json({ error: 'Предмет не найден в инвентаре или не подходит для этого слота.' });
-    const [nextItem] = char.inventory.splice(inventoryIndex, 1);
-    if (currentItem) char.inventory.push(currentItem);
-    char.equipment[slot] = nextItem;
-  } else {
-    if (currentItem) char.inventory.push(currentItem);
-    char.equipment[slot] = null;
-  }
+  const [nextItem] = char.inventory.splice(inventoryIndex, 1);
+  if (currentItem) char.inventory.push(currentItem);
+  char.equipment[slot] = nextItem;
 
   char.hp = Math.min(char.hp, char.maxHp + getEquipmentBonuses(char.equipment).maxHp);
   await saveCharacter(char);
@@ -656,7 +651,33 @@ app.post('/api/equipItem', async (req, res) => {
     character: stripPassword(withEquipmentBonuses(char)),
     equipment: char.equipment,
     inventory: char.inventory.filter((item) => item.slot && EQUIPMENT_SLOTS.includes(item.slot)),
-    bonuses: getEquipmentBonuses(char.equipment)
+    bonuses: getEquipmentBonuses(char.equipment),
+    message: `Надеты: ${nextItem.name}.${currentItem ? ` Сняты: ${currentItem.name}.` : ''}`
+  });
+});
+
+app.post('/api/unequipItem', async (req, res) => {
+  const { id, slot } = req.body;
+  if (!id || !EQUIPMENT_SLOTS.includes(slot)) {
+    return res.status(400).json({ error: 'Неверный персонаж или слот снаряжения.' });
+  }
+
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+
+  const item = char.equipment[slot];
+  if (!item) return res.status(400).json({ error: 'В этом слоте нет предмета.' });
+  char.inventory.push(item);
+  char.equipment[slot] = null;
+  char.hp = Math.min(char.hp, char.maxHp + getEquipmentBonuses(char.equipment).maxHp);
+
+  await saveCharacter(char);
+  res.json({
+    character: stripPassword(withEquipmentBonuses(char)),
+    equipment: char.equipment,
+    inventory: char.inventory.filter((inventoryItem) => inventoryItem.slot && EQUIPMENT_SLOTS.includes(inventoryItem.slot)),
+    bonuses: getEquipmentBonuses(char.equipment),
+    message: `Снято: ${item.name}. Предмет возвращён в инвентарь.`
   });
 });
 
