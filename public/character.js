@@ -20,6 +20,16 @@ function clearSessionState() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[character]);
+}
+
 function restoreSessionState() {
   try {
     const savedId = localStorage.getItem(STORAGE_ID_KEY);
@@ -41,6 +51,7 @@ function restoreSessionState() {
 function renderCharacterPage(savedCharacter = restoreSessionState()) {
   const character = savedCharacter;
   const title = document.getElementById('title');
+  const profileIdentity = document.getElementById('profileIdentity');
   const characterCard = document.getElementById('characterCard');
 
   if (!character) {
@@ -55,21 +66,81 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
       (total, item) => total + (Number(item?.statBonus?.armor) || 0),
       0
     );
-  title.textContent = character.name;
+  const strength = Number(character.str) || 0;
+  const health = Number(character.hp) || 0;
+  const energy = Number(character.mana) || 0;
+  const xp = Number(character.xp) || 0;
+  const xpToNext = Number(character.xpToNext) || 1;
+  const xpPercentage = Math.min(100, Math.max(0, Math.round((xp / xpToNext) * 100)));
+  const faction = character.faction === 'dark' ? 'Тёмные' : 'Светлые';
+  const classNames = { warrior: 'Воин', rogue: 'Разбойник', mage: 'Маг' };
+  const className = classNames[character.classId] || character.classId || 'Воин';
+  const name = escapeHTML(character.name || 'Герой');
+  const initials = escapeHTML((character.name || 'Г').trim().charAt(0).toUpperCase() || 'Г');
+
+  title.textContent = 'Мой герой';
+  profileIdentity.innerHTML = `
+    <div class="profile-avatar" role="img" aria-label="Аватар ${name}">${initials}</div>
+    <div class="profile-identity">
+      <h2 class="profile-name">${name}</h2>
+      <p>Уровень <strong>${Number(character.level) || 1}</strong> · ${escapeHTML(className)} · ${faction}</p>
+      <p class="profile-subtitle">Клан: <span>Без клана</span> · Титул: <span>Новичок</span></p>
+    </div>
+  `;
   characterCard.innerHTML = `
-    <section class="character-stats">
-    <p><strong>Класс:</strong> ${character.classId}</p>
-    <p><strong>Уровень:</strong> ${character.level}</p>
-    <p><strong>HP:</strong> ${character.hp}/${character.maxHp}</p>
-    <p class="armor-stat"><strong>Защита:</strong> ${armor}</p>
-    <p><strong>Мана:</strong> ${character.mana ?? 100}/${character.maxMana ?? 100}</p>
-    <p><strong>Сила:</strong> ${character.str}</p>
-    <p><strong>Ловкость:</strong> ${character.agi}</p>
-    <p><strong>Интеллект:</strong> ${character.int}</p>
-    <p><strong>Золото:</strong> ${character.gold}</p>
-    <p><strong>Фракция войны:</strong> ${TOWER_FACTIONS[getPlayerFaction(character)].name}</p>
-    <p><strong>Репутация:</strong> ${getPlayerStats(character).reputation}</p>
-    <p><strong>Локация:</strong> ${character.location}</p>
+    <section class="profile-section" aria-labelledby="statsHeading">
+      <h2 id="statsHeading">Характеристики</h2>
+      <dl class="profile-rows profile-stats">
+        <div><dt>Сила</dt><dd>${strength}</dd></div>
+        <div><dt>Здоровье</dt><dd>${health}/${Number(character.maxHp) || health}</dd></div>
+        <div><dt>Энергия</dt><dd>${energy}/${Number(character.maxMana) || 100}</dd></div>
+        <div><dt>Регенерация</dt><dd>+1</dd></div>
+        <div><dt>Броня</dt><dd>${armor}</dd></div>
+        <div class="profile-total"><dt>Сумма</dt><dd>${strength + health + energy + armor}</dd></div>
+      </dl>
+    </section>
+
+    <section class="profile-section" aria-labelledby="bonusesHeading">
+      <h2 id="bonusesHeading">Бонусы и модификаторы</h2>
+      <div class="profile-rows profile-bonuses">
+        <div><span>Алтарь</span><strong>+5% к опыту</strong><small>ещё 2 дн.</small></div>
+        <div><span>Мастер</span><strong>+2 к силе</strong><small>постоянно</small></div>
+        <div><span>Таланты</span><strong>+3 к здоровью</strong><small>постоянно</small></div>
+        <div><span>Набор героя</span><strong>+1 к броне</strong><small>активен</small></div>
+      </div>
+    </section>
+
+    <section class="profile-section" aria-label="Статусы героя">
+      <div class="profile-status-list">
+        <a href="#" data-profile-placeholder="Поход">Поход <span>не начат</span><b>›</b></a>
+        <a href="#" data-profile-placeholder="Премиум">Премиум <span>не активен</span><b>›</b></a>
+        <a href="#" data-profile-placeholder="Боевой навык">Боевой навык <span>0</span><b>›</b></a>
+      </div>
+      <dl class="profile-rows profile-details">
+        <div><dt>Деньги</dt><dd>${Number(character.gold) || 0} золота</dd></div>
+        <div><dt>Ресурсы</dt><dd>12 дерева · 4 руды</dd></div>
+        <div><dt>Профессия</dt><dd>Не выбрана</dd></div>
+        <div><dt>Участие</dt><dd>—</dd></div>
+        <div class="profile-experience">
+          <dt>Опыт</dt>
+          <dd>
+            <span>${xp} / ${xpToNext} (${xpPercentage}%)</span>
+            <span class="profile-progress" role="progressbar" aria-label="Опыт героя" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${xpPercentage}"><span style="width: ${xpPercentage}%"></span></span>
+          </dd>
+        </div>
+        <div><dt>Игры на арене</dt><dd>${Number(character.kills) || 0}</dd></div>
+        <div><dt>Рейтинг арены</dt><dd>0</dd></div>
+        <div><dt>Рейтинг турнира</dt><dd>—</dd></div>
+      </dl>
+      <a class="profile-statistics-link" href="#" data-profile-placeholder="Статистика героя">Статистика героя <span>›</span></a>
+    </section>
+
+    <section class="profile-section profile-extra" aria-label="Снаряжение и зелья">
+      <div class="profile-current-stats">
+        <span>Ловкость <strong>${Number(character.agi) || 0}</strong></span>
+        <span>Интеллект <strong>${Number(character.int) || 0}</strong></span>
+        <span>Локация <strong>${escapeHTML(character.location || 'town')}</strong></span>
+      </div>
     </section>
   `;
 
@@ -98,6 +169,14 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
     equipmentSection.append(icons);
   }
   characterCard.append(equipmentSection);
+
+  document.querySelectorAll('[data-profile-placeholder]').forEach((link) => {
+    link.onclick = (event) => {
+      event.preventDefault();
+      document.getElementById('profileMessage').textContent =
+        `Раздел «${link.dataset.profilePlaceholder}» скоро появится в игре.`;
+    };
+  });
 }
 
 function renderPotions(character) {
