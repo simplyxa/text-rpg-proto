@@ -998,7 +998,9 @@ select option {
   flex: 0 0 68px;
   place-items: center;
   border: 2px solid #806a43;
-  border-radius: 50%;
+  border-radius: 0;
+  aspect-ratio: 1;
+  object-fit: cover;
   background: radial-gradient(circle at 35% 25%, #66543b, #29231b 72%);
   color: #ead59c;
   font-family: 'Cinzel', serif;
@@ -2262,4 +2264,17 @@ a.secondary-btn {
   font-size: 1rem;
   color: #d9b46a;
   border-bottom: 1px solid #5a4727;
+}
+
+.hp-bar {
+  position: relative;
+  z-index: 2;
+  margin: 14px auto 0;
+  padding: 6px 12px;
+  max-width: 960px;
+  border-bottom: 1px solid rgba(191, 155, 91, 0.28);
+  background: #1b1a18;
+  color: #e8998d;
+  font-weight: 700;
+  text-align: center;
 }

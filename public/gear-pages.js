@@ -30,6 +30,7 @@ function saveCharacter(nextCharacter) {
   characterId = nextCharacter.id || characterId;
   localStorage.setItem(STORAGE_ID_KEY, characterId);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(nextCharacter));
+  window.renderHpBar?.();
 }
 
 function showMessage(message) {
