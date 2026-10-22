@@ -151,6 +151,13 @@ function sanitizeInventory(inventory = []) {
       : item);
 }
 
+function hasLegacyInventoryItems(row) {
+  const inventory = Array.isArray(row.inventory)
+    ? row.inventory
+    : (typeof row.inventory === 'string' ? JSON.parse(row.inventory || '[]') : []);
+  return inventory.some((item) => item?.id === 'food' || item?.id === 'potion' || item?.name === 'Пирожок');
+}
+
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -672,15 +679,17 @@ async function listCharacters() {
 
 async function loadCharacterById(id) {
   const result = await pool.query('SELECT * FROM characters WHERE id = $1', [id]);
-  const character = deserializeCharacter(result.rows[0]);
-  if (character) await saveCharacter(character);
+  const row = result.rows[0];
+  const character = deserializeCharacter(row);
+  if (character && hasLegacyInventoryItems(row)) await saveCharacter(character);
   return character;
 }
 
 async function loadCharacterByName(name) {
   const result = await pool.query('SELECT * FROM characters WHERE name = $1', [name]);
-  const character = deserializeCharacter(result.rows[0]);
-  if (character) await saveCharacter(character);
+  const row = result.rows[0];
+  const character = deserializeCharacter(row);
+  if (character && hasLegacyInventoryItems(row)) await saveCharacter(character);
   return character;
 }
 
@@ -841,7 +850,7 @@ app.post('/api/fight', async (req, res) => {
     }
 
     if (Math.random() < 0.6) {
-      const loot = { id: 'potion', name: 'Зелье лечения', qty: 1, heal: 15 };
+      const loot = { id: 'potion_health', name: POTIONS.potion_health.name, effect: POTIONS.potion_health.effect, qty: 1 };
       const existing = char.inventory.find((item) => item.id === loot.id);
       if (existing) {
         existing.qty += loot.qty;
@@ -1030,7 +1039,7 @@ app.post('/api/fight/attack', async (req, res) => {
   const log = [];
 
   const crit = Math.random() < 0.1;
-  const base = randInt(1, 6) + char.str + bonuses.str + Math.floor(char.level / 2);
+  const base = randInt(1, 6) + char.str + bonuses.str + getActivePotionBonuses(char).str + Math.floor(char.level / 2);
   const damage = Math.max(1, (crit ? base * 2 : base) - target.def);
   target.hp = Math.max(0, target.hp - damage);
   log.push(crit

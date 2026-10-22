@@ -164,41 +164,35 @@ async function unequipItem(slot) {
   }
 }
 
-async function renderInventoryPage() {
+function getUnequippedItems(items = character.inventory || []) {
+  const equippedIds = new Set(Object.values(character.equipment || {}).filter(Boolean).map((item) => item.id));
+  return items.filter((item) => item.slot && PAGE_SLOTS.some((slot) => slot.id === item.slot) && !equippedIds.has(item.id));
+}
+
+async function renderInventory() {
   const container = document.getElementById('inventoryList');
   const result = await requestJson(`/api/inventory?id=${encodeURIComponent(characterId)}`);
-  const inventory = result.inventory || [];
-  const equipped = Object.values(character.equipment || {}).filter(Boolean);
-  const items = [
-    ...equipped.map((item) => ({ ...item, equipped: true })),
-    ...inventory
-  ];
+  const items = getUnequippedItems(result.inventory || []);
   container.replaceChildren();
 
   if (!items.length) {
     const empty = document.createElement('p');
     empty.className = 'inventory-empty';
-    empty.textContent = 'Инвентарь пуст';
+    empty.textContent = 'Нет ненадетого снаряжения';
     container.append(empty);
     return;
   }
 
   items.forEach((item) => {
-    const details = [item.slot ? `Защита: +${itemArmor(item)}` : '', item.qty > 1 ? `Количество: ${item.qty}` : ''].filter(Boolean).join(' • ');
+    const details = `Защита: +${itemArmor(item)} • Урон: +${Number(item.statBonus?.str) || 0}`;
     const row = createGearRow(item.name, item.rarity, details, item);
-    if (item.equipped) {
-      const equippedLabel = document.createElement('span');
-      equippedLabel.className = 'equipped-label';
-      equippedLabel.textContent = '(надет)';
-      row.append(equippedLabel);
-    } else if (item.slot) {
-      const button = document.createElement('button');
-      button.className = 'small-btn';
-      button.type = 'button';
-      button.textContent = 'Надеть';
-      button.addEventListener('click', () => equipItem(item.id));
-      row.append(button);
-    }
+    row.classList.add('inventory-item-row');
+    const button = document.createElement('button');
+    button.className = 'small-btn inventory-equip-button';
+    button.type = 'button';
+    button.textContent = 'Надеть';
+    button.addEventListener('click', () => equipItemFromInventory(item.id));
+    row.append(button);
     container.append(row);
   });
   renderInventoryWithIcons(container);
@@ -207,13 +201,13 @@ async function renderInventoryPage() {
 async function loadInventoryPage() {
   if (!await loadCharacter()) return;
   try {
-    await renderInventoryPage();
+    await renderInventory();
   } catch (error) {
     showMessage(error.message);
   }
 }
 
-async function equipItem(itemId) {
+async function equipItemFromInventory(itemId) {
   const item = character.inventory?.find((candidate) => candidate.id === itemId);
   if (!item?.slot) {
     showMessage('Этот предмет нельзя надеть.');
@@ -227,7 +221,7 @@ async function equipItem(itemId) {
       body: JSON.stringify({ id: characterId, itemId, slot: item.slot })
     });
     saveCharacter(result.character);
-    await renderInventoryPage();
+    await renderInventory();
     showMessage(result.message);
   } catch (error) {
     showMessage(error.message);
