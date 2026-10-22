@@ -1109,6 +1109,183 @@ a.secondary-btn {
   animation: bounce 0.6s ease-in-out;
 }
 
+.quests-page {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.quests-page h1,
+.daily-quest-section h2,
+.daily-quest-card h3 {
+  font-family: 'Cinzel', serif;
+}
+
+.daily-quest-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 20px 0;
+  padding: 14px 18px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-bg);
+}
+
+.streak-counter {
+  color: var(--accent-neon);
+  text-shadow: 0 0 10px var(--neon-glow);
+}
+
+.streak-counter strong {
+  font-size: 1.2rem;
+}
+
+.date-display {
+  color: var(--text-secondary);
+}
+
+.daily-quest-section {
+  margin: 26px 0;
+}
+
+.daily-quest-section h2 {
+  color: var(--accent-neon);
+  font-size: 1.25rem;
+}
+
+.daily-quests-list {
+  display: grid;
+  gap: 14px;
+}
+
+.daily-quest-card {
+  padding: 18px;
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(10, 10, 26, 0.92));
+  box-shadow: 0 0 18px rgba(124, 58, 237, 0.12);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.daily-quest-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-neon);
+  box-shadow: 0 0 22px var(--neon-glow);
+}
+
+.daily-quest-header,
+.daily-quest-progress-info,
+.daily-quest-reward,
+.daily-quest-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.daily-quest-header h3 {
+  margin: 0;
+  color: #fff;
+}
+
+.daily-quest-status {
+  flex: 0 0 auto;
+  color: var(--accent-neon);
+  font-size: 0.85rem;
+}
+
+.daily-quest-status.completed {
+  color: #7dffb3;
+}
+
+.daily-quest-status.skipped {
+  color: var(--text-muted);
+}
+
+.daily-quest-description {
+  color: var(--text-secondary);
+}
+
+.daily-quest-progress-info {
+  margin-bottom: 7px;
+  font-size: 0.9rem;
+}
+
+.daily-quest-progress-bar {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.daily-quest-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7c3aed, #a855f7 55%, #00ffff);
+  box-shadow: 0 0 12px var(--neon-glow);
+  transition: width 0.4s ease;
+}
+
+.daily-quest-reward {
+  justify-content: flex-start;
+  margin: 14px 0;
+}
+
+.quest-reward-exp {
+  color: #55aaff;
+}
+
+.quest-reward-gold {
+  color: #ffd84d;
+}
+
+.daily-quest-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.daily-quest-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+  box-shadow: none;
+}
+
+.daily-quest-actions .daily-quest-skip {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+.daily-quest-empty,
+.quest-page-message {
+  color: var(--text-secondary);
+}
+
+.daily-quest-nav {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.btn-nav {
+  display: inline-block;
+  padding: 12px 22px;
+  border: 1px solid var(--accent-neon);
+  border-radius: 8px;
+  color: var(--accent-neon);
+  text-decoration: none;
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.15);
+}
+
+.btn-nav:hover {
+  color: #fff;
+  background: rgba(0, 255, 255, 0.12);
+  box-shadow: 0 0 22px var(--neon-glow);
+}
+
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-8px); }
@@ -1196,6 +1373,23 @@ a.secondary-btn {
 }
 
 @media (max-width: 480px) {
+  .daily-quest-info,
+  .daily-quest-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .daily-quest-actions,
+  .daily-quest-nav {
+    flex-direction: column;
+  }
+
+  .daily-quest-actions button,
+  .daily-quest-nav .btn-nav {
+    width: 100%;
+    text-align: center;
+  }
+
   .auth-card {
     padding: 22px 16px;
   }
