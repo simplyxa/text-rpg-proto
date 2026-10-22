@@ -31,8 +31,7 @@ function loadHero() {
     return null;
   }
 
-  const cityTitle = document.getElementById('cityTitle');
-  cityTitle.textContent = hero.name;
+  document.getElementById('heroName').textContent = hero.name;
 
   return hero;
 }
@@ -45,12 +44,10 @@ document.addEventListener('DOMContentLoaded', () => {
     button.onclick = () => {
       const action = button.dataset.action;
 
-      if (action === 'forest') window.location.href = '/?mode=forest';
-      if (action === 'cave') window.location.href = '/?mode=cave';
       if (action === 'shop') window.location.href = '/?mode=shop';
       if (action === 'inventory') window.location.href = '/?mode=inventory';
       if (action === 'quests') window.location.href = '/?mode=quests';
-      if (action === 'profile') window.location.href = '/?mode=profile';
+      if (action === 'profile') window.location.href = '/character';
     };
   });
 });

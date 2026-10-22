@@ -707,3 +707,14 @@ button:active {
     grid-template-columns: 1fr;
   }
 }
+
+.location-list { list-style: none; padding: 0; margin: 0 0 16px; }
+.location-list li { margin: 8px 0; }
+.location-list a { font-weight: bold; }
+a.primary-btn, a.secondary-btn { display: block; text-align: center; text-decoration: none; }
+.enemies { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.enemy-card { flex: 1 1 140px; display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid #555; border-radius: 8px; cursor: pointer; }
+.enemy-card.selected { border-color: #e0b04a; }
+.enemy-card.dead { opacity: 0.4; cursor: default; }
+.battle-log { min-height: 5.5em; margin: 16px 0; padding: 8px 12px; border: 1px solid #555; border-radius: 8px; }
+.battle-log .log-line { padding: 2px 0; }
