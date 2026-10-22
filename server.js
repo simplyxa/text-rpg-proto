@@ -361,12 +361,12 @@ async function listCharacters() {
 
 async function loadCharacterById(id) {
   const result = await pool.query('SELECT * FROM characters WHERE id = $1', [id]);
-  return stripPassword(deserializeCharacter(result.rows[0]));
+  return deserializeCharacter(result.rows[0]);
 }
 
 async function loadCharacterByName(name) {
   const result = await pool.query('SELECT * FROM characters WHERE name = $1', [name]);
-  return stripPassword(deserializeCharacter(result.rows[0]));
+  return deserializeCharacter(result.rows[0]);
 }
 
 const app = express();
