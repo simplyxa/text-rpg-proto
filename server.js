@@ -12,6 +12,30 @@ const pool = new Pool({
 
 const EQUIPMENT_SLOTS = ['helmet', 'chest', 'shield', 'hands', 'armor', 'boots', 'cloak', 'ring'];
 
+const LOCATIONS = [
+  { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
+  { id: 'forest', name: 'Лес', description: 'Темный лес. Здесь встречаются гоблины и волки.', monsters: ['goblin', 'wolf'] },
+  { id: 'cave', name: 'Пещера', description: 'Зловещая пещера, где прячутся бандиты и опасные существа.', monsters: ['bandit', 'slime'] }
+];
+
+const MONSTERS = {
+  goblin: { id: 'goblin', name: 'Гоблин', hp: 14, atk: 4, def: 1, xp: 10, gold: 7 },
+  wolf: { id: 'wolf', name: 'Волк', hp: 18, atk: 5, def: 1, xp: 15, gold: 10 },
+  bandit: { id: 'bandit', name: 'Бандит', hp: 24, atk: 7, def: 2, xp: 18, gold: 18, rarity: 'rare' },
+  slime: { id: 'slime', name: 'Слизь', hp: 16, atk: 4, def: 1, xp: 12, gold: 9 }
+};
+
+const EQUIPMENT_DROP_TEMPLATES = [
+  { slot: 'helmet', name: 'Шлем' },
+  { slot: 'chest', name: 'Нагрудник' },
+  { slot: 'shield', name: 'Щит' },
+  { slot: 'hands', name: 'Перчатки' },
+  { slot: 'armor', name: 'Доспех' },
+  { slot: 'boots', name: 'Ботинки' },
+  { slot: 'cloak', name: 'Плащ' },
+  { slot: 'ring', name: 'Кольцо' }
+];
+
 function createEquipmentItem(id, name, slot, rarity, statBonus) {
   return {
     id,
@@ -74,6 +98,27 @@ function withEquipmentBonuses(character) {
 
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function createEquipmentDrop(rarity) {
+  const template = EQUIPMENT_DROP_TEMPLATES[randInt(0, EQUIPMENT_DROP_TEMPLATES.length - 1)];
+  const stats = ['str', 'agi', 'int', 'maxHp'];
+  const statBonus = { str: 0, agi: 0, int: 0, maxHp: 0 };
+  const bonusCount = randInt(1, 2);
+
+  for (let i = 0; i < bonusCount; i += 1) {
+    const availableStats = stats.filter((stat) => statBonus[stat] === 0);
+    const stat = availableStats[randInt(0, availableStats.length - 1)];
+    statBonus[stat] = rarity === 'rare' ? randInt(2, 4) : randInt(1, 2);
+  }
+
+  return createEquipmentItem(
+    `${template.slot}_${uid()}`,
+    `${template.name} ${rarity === 'rare' ? 'редкого качества' : 'обычный'}`,
+    template.slot,
+    rarity,
+    statBonus
+  );
 }
 
 function uid() {
@@ -391,26 +436,13 @@ app.get('/api/characters', async (req, res) => {
 
 app.get('/api/world', (req, res) => {
   res.json({
-    locations: [
-      { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
-      { id: 'forest', name: 'Лес', description: 'Темный лес. Здесь встречаются гоблины и волки.', monsters: ['goblin', 'wolf'] },
-      { id: 'cave', name: 'Пещера', description: 'Зловещая пещера, где прячутся бандиты и опасные существа.', monsters: ['bandit', 'slime'] }
-    ],
-    monsters: {
-      goblin: { id: 'goblin', name: 'Гоблин', hp: 14, atk: 4, def: 1, xp: 10, gold: 7 },
-      wolf: { id: 'wolf', name: 'Волк', hp: 18, atk: 5, def: 1, xp: 15, gold: 10 },
-      bandit: { id: 'bandit', name: 'Бандит', hp: 24, atk: 7, def: 2, xp: 18, gold: 18 },
-      slime: { id: 'slime', name: 'Слизь', hp: 16, atk: 4, def: 1, xp: 12, gold: 9 }
-    }
+    locations: LOCATIONS,
+    monsters: MONSTERS
   });
 });
 
 app.get('/api/locations', (req, res) => {
-  res.json([
-    { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
-    { id: 'forest', name: 'Лес', description: 'Темный лес. Здесь встречаются гоблины и волки.', monsters: ['goblin', 'wolf'] },
-    { id: 'cave', name: 'Пещера', description: 'Зловещая пещера, где прячутся бандиты и опасные существа.', monsters: ['bandit', 'slime'] }
-  ]);
+  res.json(LOCATIONS);
 });
 
 app.post('/api/registerCharacter', async (req, res) => {
@@ -485,12 +517,7 @@ app.post('/api/updateCharacter', async (req, res) => {
 app.post('/api/travel', async (req, res) => {
   const { id, to } = req.body;
   const char = await loadCharacterById(id);
-  const locs = [
-    { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
-    { id: 'forest', name: 'Лес', description: 'Темный лес. Здесь встречаются гоблины и волки.', monsters: ['goblin', 'wolf'] },
-    { id: 'cave', name: 'Пещера', description: 'Зловещая пещера, где прячутся бандиты и опасные существа.', monsters: ['bandit', 'slime'] }
-  ];
-  const loc = locs.find((l) => l.id === to);
+  const loc = LOCATIONS.find((location) => location.id === to);
 
   if (!char || !loc) return res.status(400).json({ error: 'Неверные данные для перемещения.' });
 
@@ -504,26 +531,14 @@ app.post('/api/fight', async (req, res) => {
   let char = await loadCharacterById(id);
   if (!char) return res.status(400).json({ error: 'Персонаж не найден.' });
 
-  const locs = [
-    { id: 'town', name: 'Город', description: 'Тихий город. Можно отдохнуть, купить зелья и подготовиться к бою.', monsters: [] },
-    { id: 'forest', name: 'Лес', description: 'Темный лес. Здесь встречаются гоблины и волки.', monsters: ['goblin', 'wolf'] },
-    { id: 'cave', name: 'Пещера', description: 'Зловещая пещера, где прячутся бандиты и опасные существа.', monsters: ['bandit', 'slime'] }
-  ];
-  const loc = locs.find((l) => l.id === char.location);
+  const loc = LOCATIONS.find((location) => location.id === char.location);
 
   if (!loc || !loc.monsters || loc.monsters.length === 0) {
     return res.json({ message: 'Здесь нет врагов.', character: stripPassword(withEquipmentBonuses(char)) });
   }
 
-  const monsters = {
-    goblin: { id: 'goblin', name: 'Гоблин', hp: 14, atk: 4, def: 1, xp: 10, gold: 7 },
-    wolf: { id: 'wolf', name: 'Волк', hp: 18, atk: 5, def: 1, xp: 15, gold: 10 },
-    bandit: { id: 'bandit', name: 'Бандит', hp: 24, atk: 7, def: 2, xp: 18, gold: 18 },
-    slime: { id: 'slime', name: 'Слизь', hp: 16, atk: 4, def: 1, xp: 12, gold: 9 }
-  };
-
   const monsterId = loc.monsters[randInt(0, loc.monsters.length - 1)];
-  const monster = { ...monsters[monsterId] };
+  const monster = { ...MONSTERS[monsterId] };
   const log = [];
   const equipmentBonuses = getEquipmentBonuses(char.equipment);
   const effectiveMaxHp = char.maxHp + equipmentBonuses.maxHp;
@@ -570,6 +585,16 @@ app.post('/api/fight', async (req, res) => {
         char.inventory.push(loot);
       }
       log.push(`Найден предмет: ${loot.name} x${loot.qty}`);
+    }
+
+    const equipmentDropChance = monster.rarity === 'rare' ? 0.03 : 0.2;
+    if (Math.random() < equipmentDropChance) {
+      const loot = createEquipmentDrop(monster.rarity === 'rare' ? 'rare' : 'common');
+      char.inventory.push(loot);
+      log.push(`Найдено снаряжение: ${loot.name} (${loot.slot}), бонусы: ${Object.entries(loot.statBonus)
+        .filter(([, value]) => value > 0)
+        .map(([stat, value]) => `${stat} +${value}`)
+        .join(', ')}.`);
     }
 
     updateQuests(char);
