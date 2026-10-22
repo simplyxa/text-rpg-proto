@@ -44,8 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
     button.onclick = () => {
       const action = button.dataset.action;
 
-      if (action === 'shop') window.location.href = '/?mode=shop';
-      if (action === 'inventory') window.location.href = '/?mode=inventory';
+      if (action === 'shop') window.location.href = '/shop';
+      if (action === 'inventory') window.location.href = '/inventory';
       if (action === 'quests') window.location.href = '/?mode=quests';
       if (action === 'profile') window.location.href = '/character';
     };

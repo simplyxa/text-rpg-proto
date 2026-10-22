@@ -854,6 +854,93 @@ select option {
   margin: 20px 0 0;
 }
 
+.gear-page {
+  width: min(100%, 760px);
+  padding: 28px;
+  border-radius: 16px;
+}
+
+.gear-list {
+  display: grid;
+  gap: 10px;
+}
+
+.gear-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-bg);
+}
+
+.gear-row:hover {
+  border-color: var(--accent-neon);
+  box-shadow: 0 0 16px var(--neon-glow);
+}
+
+.gear-description,
+.equipped-details {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.gear-rarity,
+.gear-detail,
+.equipped-details span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.gear-message {
+  min-height: 1.5em;
+  color: var(--accent-neon);
+  text-align: center;
+}
+
+.gear-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.gear-nav a {
+  width: 100%;
+  padding: 8px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.gold-display {
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--accent-neon);
+  text-align: center;
+  box-shadow: 0 0 14px var(--neon-glow);
+}
+
+.buy-set-button {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.equipped-label {
+  color: var(--accent-neon);
+  white-space: nowrap;
+}
+
+.equipment-page-slot .equipment-empty {
+  width: auto;
+}
+
 .character-block {
   border: 1px solid transparent;
   border-radius: 12px;
@@ -1135,6 +1222,15 @@ a.secondary-btn {
 
   .small-btn {
     align-self: stretch;
+  }
+
+  .gear-page {
+    padding: 22px 16px;
+  }
+
+  .gear-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .enemy-card {

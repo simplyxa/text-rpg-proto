@@ -36,6 +36,19 @@ const EQUIPMENT_DROP_TEMPLATES = [
   { slot: 'ring', name: 'Кольцо' }
 ];
 
+const SHOP_EQUIPMENT = [
+  { id: 'helmet', name: 'Шлем', slot: 'helmet', statBonus: { maxHp: 2 } },
+  { id: 'amulet', name: 'Амулет', slot: 'ring', statBonus: { int: 1 } },
+  { id: 'armor', name: 'Броня', slot: 'chest', statBonus: { str: 1 } },
+  { id: 'gloves', name: 'Перчатки', slot: 'hands', statBonus: { agi: 1 } },
+  { id: 'pants', name: 'Штаны', slot: 'armor', statBonus: { maxHp: 1 } },
+  { id: 'boots', name: 'Сапоги', slot: 'boots', statBonus: { agi: 1 } },
+  { id: 'left_blade', name: 'Левый клинок', slot: 'shield', statBonus: { str: 1 } },
+  { id: 'right_blade', name: 'Правый клинок', slot: 'cloak', statBonus: { str: 1 } }
+];
+const SHOP_ITEM_PRICE = 1500;
+const SHOP_SET_PRICE = 10000;
+
 function createEquipmentItem(id, name, slot, rarity, statBonus) {
   return {
     id,
@@ -835,7 +848,16 @@ app.post('/api/fight/bosses/defeat', async (req, res) => {
   res.json({ log, character: stripPassword(withEquipmentBonuses(char)) });
 });
 
-const PAGES = { '/city': 'city.html', '/forest': 'forest.html', '/cave': 'cave.html', '/character': 'character.html', '/fight': 'fight.html', '/inventory': 'index.html', '/equipment': 'index.html' };
+const PAGES = {
+  '/city': 'city.html',
+  '/forest': 'forest.html',
+  '/cave': 'cave.html',
+  '/character': 'character.html',
+  '/fight': 'fight.html',
+  '/inventory': 'inventory.html',
+  '/equipment': 'equipment.html',
+  '/shop': 'shop.html'
+};
 for (const [route, file] of Object.entries(PAGES)) {
   app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'public', file)));
 }
@@ -954,6 +976,47 @@ app.post('/api/buyPotion', async (req, res) => {
 
   await saveCharacter(char);
   res.json({ message: 'Куплено зелье лечения.', character: stripPassword(withEquipmentBonuses(char)) });
+});
+
+app.post('/api/buyEquipment', async (req, res) => {
+  const { id, itemId } = req.body;
+  const item = SHOP_EQUIPMENT.find((candidate) => candidate.id === itemId);
+  if (!id || !item) return res.status(400).json({ error: 'Неизвестный предмет.' });
+
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+  if (char.gold < SHOP_ITEM_PRICE) return res.status(400).json({ error: 'Недостаточно золота.' });
+
+  char.gold -= SHOP_ITEM_PRICE;
+  char.inventory.push(createEquipmentItem(
+    `${item.id}_${uid()}`,
+    item.name,
+    item.slot,
+    'common',
+    item.statBonus
+  ));
+  await saveCharacter(char);
+  res.json({ message: `Куплено: ${item.name}.`, character: stripPassword(withEquipmentBonuses(char)) });
+});
+
+app.post('/api/buyEquipmentSet', async (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'Нужно id персонажа.' });
+
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+  if (char.gold < SHOP_SET_PRICE) return res.status(400).json({ error: 'Недостаточно золота.' });
+
+  char.gold -= SHOP_SET_PRICE;
+  char.inventory.push(...SHOP_EQUIPMENT.map((item) => createEquipmentItem(
+    `${item.id}_${uid()}`,
+    item.name,
+    item.slot,
+    'common',
+    item.statBonus
+  )));
+  await saveCharacter(char);
+  res.json({ message: 'Куплен полный комплект снаряжения.', character: stripPassword(withEquipmentBonuses(char)) });
 });
 
 const PORT = process.env.PORT || 3000;
