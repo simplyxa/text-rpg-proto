@@ -77,9 +77,12 @@ function itemArmor(item) {
   return shopItem?.armor ?? slotArmor[item?.slot] ?? 0;
 }
 
-function createGearRow(name, rarity, details = '') {
+function createGearRow(name, rarity, details = '', item = null) {
   const row = document.createElement('article');
   row.className = 'gear-row';
+  if (item?.id) row.dataset.iconId = item.id;
+  if (item?.slot) row.dataset.iconSlot = item.slot;
+  if (item?.rarity) row.dataset.iconRarity = item.rarity;
   const description = document.createElement('div');
   description.className = 'gear-description';
   const itemName = document.createElement('strong');
@@ -108,9 +111,9 @@ function renderEquipmentPage() {
   const container = document.getElementById('equipmentList');
   container.replaceChildren();
   PAGE_SLOTS.forEach(({ id, name }) => {
-    const row = createGearRow(name);
-    row.classList.add('equipment-page-slot');
     const item = character.equipment?.[id];
+    const row = createGearRow(name, undefined, '', item);
+    row.classList.add('equipment-page-slot');
     if (item) {
       const itemDetails = document.createElement('div');
       itemDetails.className = 'equipped-details';
@@ -139,6 +142,7 @@ function renderEquipmentPage() {
     }
     container.append(row);
   });
+  renderEquipmentWithIcons(container);
 }
 
 async function loadEquipmentPage() {
@@ -181,7 +185,7 @@ async function renderInventoryPage() {
 
   items.forEach((item) => {
     const details = [item.slot ? `Защита: +${itemArmor(item)}` : '', item.qty > 1 ? `Количество: ${item.qty}` : ''].filter(Boolean).join(' • ');
-    const row = createGearRow(item.name, item.rarity, details);
+    const row = createGearRow(item.name, item.rarity, details, item);
     if (item.equipped) {
       const equippedLabel = document.createElement('span');
       equippedLabel.className = 'equipped-label';
@@ -197,6 +201,7 @@ async function renderInventoryPage() {
     }
     container.append(row);
   });
+  renderInventoryWithIcons(container);
 }
 
 async function loadInventoryPage() {
@@ -235,7 +240,7 @@ async function loadShopPage() {
   const container = document.getElementById('shopItems');
   container.replaceChildren();
   SHOP_ITEMS.forEach((item) => {
-    const row = createGearRow(item.name, 'common', `Защита: +${item.armor} • 1500 золота`);
+    const row = createGearRow(item.name, 'common', `Защита: +${item.armor} • 1500 золота`, item);
     const button = document.createElement('button');
     button.className = 'small-btn';
     button.type = 'button';
@@ -244,6 +249,7 @@ async function loadShopPage() {
     row.append(button);
     container.append(row);
   });
+  renderShopWithIcons(container);
   document.getElementById('buySetButton').addEventListener('click', buyEquipmentSet);
 }
 
