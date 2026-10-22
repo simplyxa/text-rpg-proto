@@ -824,7 +824,8 @@ app.post('/api/fight', async (req, res) => {
 
     if (monster.hp <= 0) break;
 
-    const monsterDamage = Math.max(1, monster.atk + randInt(0, 3) - Math.floor((char.agi + equipmentBonuses.agi) / 3));
+    const baseMonsterDamage = Math.max(1, monster.atk + randInt(0, 3) - Math.floor((char.agi + equipmentBonuses.agi) / 3));
+    const monsterDamage = calculateDamageAfterArmor(baseMonsterDamage, potionBonuses.armor);
     char.hp -= monsterDamage;
     log.push(`${monster.name} наносит ${monsterDamage} урона ${char.name}.`);
   }
@@ -1059,10 +1060,11 @@ app.post('/api/fight/attack', async (req, res) => {
 
   for (const enemy of session.enemies.filter((e) => e.hp > 0)) {
     const baseDamage = enemy.atk + randInt(0, 3) - Math.floor((char.agi + bonuses.agi) / 3);
-    const hit = calculateDamageAfterArmor(baseDamage, bonuses.armor + getActivePotionBonuses(char).armor);
+    const armor = bonuses.armor + getActivePotionBonuses(char).armor;
+    const hit = calculateDamageAfterArmor(baseDamage, armor);
     char.hp = Math.max(0, char.hp - hit);
     const prevented = Math.max(0, baseDamage - hit);
-    log.push(`${enemy.name} атаковал вас на ${hit} урона${bonuses.armor ? ` (защита: ${bonuses.armor}, снижено на ${prevented})` : ''}`);
+    log.push(`${enemy.name} атаковал вас на ${hit} урона${armor ? ` (защита: ${armor}, снижено на ${prevented})` : ''}`);
     if (char.hp <= 0) break;
   }
 
