@@ -22,6 +22,8 @@ function hashPassword(password) {
   return crypto.createHash('sha256').update(String(password)).digest('hex');
 }
 
+const FACTIONS = ['light', 'dark'];
+
 function stripPassword(character) {
   if (!character) return null;
   const copy = { ...character };
@@ -55,7 +57,7 @@ function createDefaultQuests() {
   ];
 }
 
-function buildCharacter(name, classId, passwordHash, id = uid()) {
+function buildCharacter(name, classId, passwordHash, faction = 'light', id = uid()) {
   const base = { hp: 30, str: 5, agi: 4, int: 3 };
   if (classId === 'warrior') base.str += 2;
   if (classId === 'rogue') base.agi += 2;
@@ -65,6 +67,7 @@ function buildCharacter(name, classId, passwordHash, id = uid()) {
     id,
     name,
     classId: classId || 'warrior',
+    faction: faction || 'light',
     level: 1,
     xp: 0,
     xpToNext: 30,
@@ -105,6 +108,7 @@ function serializeCharacter(character) {
     id: character.id,
     name: character.name,
     classId: character.classId,
+    faction: character.faction || 'light',
     level: character.level,
     xp: character.xp,
     xpToNext: character.xpToNext,
@@ -138,6 +142,7 @@ function deserializeCharacter(row) {
     id: row.id,
     name: row.name,
     classId: row.classid || row.classId,
+    faction: row.faction || 'light',
     level: row.level,
     xp: row.xp,
     xpToNext: row.xptonext || row.xpToNext,
@@ -165,6 +170,7 @@ async function initDatabase() {
     'id TEXT',
     'name TEXT',
     'classid TEXT',
+    "faction TEXT DEFAULT 'light'",
     'level INTEGER',
     'xp INTEGER',
     'xptonext INTEGER',
@@ -195,6 +201,7 @@ async function initDatabase() {
       id TEXT PRIMARY KEY,
       name TEXT,
       classid TEXT,
+      faction TEXT DEFAULT 'light',
       level INTEGER,
       xp INTEGER,
       xptonext INTEGER,
@@ -228,11 +235,12 @@ async function saveCharacter(character) {
   const row = serializeCharacter(character);
   await pool.query(
     `INSERT INTO characters (
-      id, name, classid, level, xp, xptonext, maxhp, hp, str, agi, int, gold, location, kills, inventory, quests, passwordhash, createdat
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      id, name, classid, faction, level, xp, xptonext, maxhp, hp, str, agi, int, gold, location, kills, inventory, quests, passwordhash, createdat
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
       classid = EXCLUDED.classid,
+      faction = EXCLUDED.faction,
       level = EXCLUDED.level,
       xp = EXCLUDED.xp,
       xptonext = EXCLUDED.xptonext,
@@ -252,6 +260,7 @@ async function saveCharacter(character) {
       row.id,
       row.name,
       row.classId,
+      row.faction,
       row.level,
       row.xp,
       row.xpToNext,
@@ -321,7 +330,7 @@ app.get('/api/locations', (req, res) => {
 });
 
 app.post('/api/registerCharacter', async (req, res) => {
-  const { nickname, classId, password } = req.body;
+  const { nickname, classId, faction, password } = req.body;
   const cleanName = String(nickname || '').trim();
 
   if (!cleanName) return res.status(400).json({ error: 'Введите уникальный ник.' });
@@ -334,10 +343,11 @@ app.post('/api/registerCharacter', async (req, res) => {
   const existing = await loadCharacterByName(cleanName);
   if (existing) return res.status(409).json({ error: 'Такой ник уже занят.' });
 
-  const classMap = ['warrior', 'rogue', 'mage'];
+  const classMap = ['warrior', 'rogue', 'mage', 'healer'];
   const finalClass = classMap.includes(classId) ? classId : 'warrior';
+  const finalFaction = FACTIONS.includes(faction) ? faction : 'light';
 
-  const character = buildCharacter(cleanName, finalClass, hashPassword(passwordValue));
+  const character = buildCharacter(cleanName, finalClass, hashPassword(passwordValue), finalFaction);
   await saveCharacter(character);
   res.json({ character: stripPassword(character), notice: 'Советуем придумать пароль к 10 уровню и не хранить его в открытом виде.' });
 });
@@ -370,6 +380,20 @@ app.get('/api/character', async (req, res) => {
   if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
 
   updateQuests(char);
+  await saveCharacter(char);
+  res.json({ character: stripPassword(char) });
+});
+
+app.post('/api/updateCharacter', async (req, res) => {
+  const { id, classId, faction } = req.body;
+  if (!id) return res.status(400).json({ error: 'Нужно id персонажа.' });
+
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+
+  if (['warrior', 'rogue', 'mage', 'healer'].includes(classId)) char.classId = classId;
+  if (FACTIONS.includes(faction)) char.faction = faction;
+
   await saveCharacter(char);
   res.json({ character: stripPassword(char) });
 });
