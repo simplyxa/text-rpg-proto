@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Битва за Башню — Карта</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/css/towers.css">
+</head>
+<body>
+  <div class="page-shell">
+    <main class="panel towers-page">
+      <header class="auth-header">
+        <span class="eyebrow">Союз против Империи</span>
+        <h1>⚔️ Битва за Башню</h1>
+        <p id="towersPlayer"></p>
+      </header>
+      <p id="towersMessage" class="towers-message" role="status" aria-live="polite"></p>
+      <div class="towers-layout">
+        <canvas id="towersCanvas" width="500" height="500"></canvas>
+        <div id="towerInfo" class="tower-info-box"></div>
+      </div>
+      <h2>Все башни</h2>
+      <div id="towersList" class="towers-list"></div>
+      <nav class="towers-nav" aria-label="Навигация">
+        <a href="/character">На профиль</a>
+        <a href="/faction-war">Статистика войны</a>
+        <a href="/">Главное меню</a>
+      </nav>
+    </main>
+  </div>
+  <script src="/js/towers.js"></script>
+  <script>initTowersMap();</script>
+</body>
+</html>
