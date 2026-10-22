@@ -295,7 +295,7 @@ function showAuthScreen() {
 }
 
 function goToCityPage() {
-  window.location.href = '/city.html';
+  window.location.href = '/city';
 }
 
 function renderCharacter(c) {

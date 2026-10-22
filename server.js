@@ -617,6 +617,229 @@ app.post('/api/fight', async (req, res) => {
   res.json({ victory: false, log, character: stripPassword(withEquipmentBonuses(char)) });
 });
 
+const FOREST_ENEMIES = [
+  { name: 'Гоблин', hp: 14, atk: 4, def: 1, xp: 10, gold: 7 },
+  { name: 'Орк', hp: 22, atk: 6, def: 2, xp: 16, gold: 12 },
+  { name: 'Волк', hp: 18, atk: 5, def: 1, xp: 15, gold: 10 },
+  { name: 'Тролль', hp: 28, atk: 7, def: 2, xp: 20, gold: 15 }
+];
+
+const CAVE_ENEMIES = [
+  { name: 'Пещерный Паук', hp: 24, atk: 7, def: 2, xp: 20, gold: 14 },
+  { name: 'Минотавр', hp: 36, atk: 9, def: 3, xp: 30, gold: 22 },
+  { name: 'Каменный Голем', hp: 44, atk: 8, def: 5, xp: 34, gold: 26 }
+];
+
+const BOSS_TEMPLATE = { name: 'Король Гоблинов', hp: 60, atk: 10, def: 3, xp: 120, gold: 150 };
+const FIGHT_LOCATIONS = ['forest', 'cave'];
+const fightSessions = new Map();
+
+function createEnemies(location, level) {
+  const pool = location === 'cave' ? CAVE_ENEMIES : FOREST_ENEMIES;
+  const count = location === 'cave' ? 3 : 1;
+  const enemies = [];
+  for (let i = 0; i < count; i += 1) {
+    const tpl = pool[randInt(0, pool.length - 1)];
+    enemies.push({ id: `e${i + 1}`, ...tpl, maxHp: tpl.hp, isBoss: false });
+  }
+  return enemies;
+}
+
+function createBoss(level) {
+  const hp = BOSS_TEMPLATE.hp + level * 20;
+  return {
+    id: 'boss',
+    ...BOSS_TEMPLATE,
+    hp,
+    maxHp: hp,
+    atk: BOSS_TEMPLATE.atk + level * 2,
+    def: BOSS_TEMPLATE.def + Math.floor(level / 2),
+    isBoss: true
+  };
+}
+
+function describeBonuses(item) {
+  return Object.entries(item.statBonus).filter(([, v]) => v > 0).map(([k, v]) => `${k} +${v}`).join(', ');
+}
+
+function grantReward(char, reward, log, { equipmentChance, equipmentRarity }) {
+  char.xp += reward.xp;
+  char.gold += reward.gold;
+  log.push(`Получено ${reward.xp} XP и ${reward.gold} золота.`);
+
+  const bonuses = getEquipmentBonuses(char.equipment);
+  while (char.xp >= char.xpToNext) {
+    char.xp -= char.xpToNext;
+    char.level += 1;
+    char.str += 1;
+    char.agi += 1;
+    char.int += 1;
+    char.maxHp += 5;
+    char.hp = char.maxHp + bonuses.maxHp;
+    char.xpToNext = Math.round(char.xpToNext * 1.4);
+    log.push(`${char.name} достиг(ла) уровня ${char.level}!`);
+  }
+
+  if (Math.random() < equipmentChance) {
+    const loot = createEquipmentDrop(equipmentRarity);
+    char.inventory.push(loot);
+    log.push(`Найдено снаряжение: ${loot.name} (${loot.slot}), бонусы: ${describeBonuses(loot)}.`);
+  }
+}
+
+function fightPayload(char, session, log) {
+  return {
+    location: session.location,
+    phase: session.phase,
+    enemies: session.enemies,
+    log,
+    character: stripPassword(withEquipmentBonuses(char))
+  };
+}
+
+async function loadFightContext(req, res, source) {
+  const { id, location } = source;
+  if (!id) {
+    res.status(400).json({ error: 'Нужно id персонажа.' });
+    return null;
+  }
+  const char = await loadCharacterById(id);
+  if (!char) {
+    res.status(404).json({ error: 'Персонаж не найден.' });
+    return null;
+  }
+  return { char, location };
+}
+
+app.get('/api/fight', async (req, res) => {
+  const { location, action } = req.query;
+  if (!FIGHT_LOCATIONS.includes(location)) return res.status(400).json({ error: 'Неизвестная локация.' });
+  if (action !== 'start') return res.status(400).json({ error: 'Неизвестное действие.' });
+
+  const ctx = await loadFightContext(req, res, req.query);
+  if (!ctx) return;
+  const { char } = ctx;
+
+  const session = { location, phase: 'fight', enemies: createEnemies(location, char.level) };
+  fightSessions.set(char.id, session);
+  char.location = location;
+  await saveCharacter(char);
+
+  const names = session.enemies.map((e) => e.name).join(', ');
+  res.json(fightPayload(char, session, [`Вы встретили: ${names}.`]));
+});
+
+app.post('/api/fight/boss', async (req, res) => {
+  const ctx = await loadFightContext(req, res, req.body);
+  if (!ctx) return;
+  const session = fightSessions.get(ctx.char.id);
+  if (!session || session.location !== 'cave' || session.phase !== 'group_cleared') {
+    return res.status(400).json({ error: 'Босс недоступен.' });
+  }
+  session.phase = 'boss';
+  session.enemies = [createBoss(ctx.char.level)];
+  res.json(fightPayload(ctx.char, session, [`Перед вами ${session.enemies[0].name}!`]));
+});
+
+app.post('/api/fight/attack', async (req, res) => {
+  const ctx = await loadFightContext(req, res, req.body);
+  if (!ctx) return;
+  const { char } = ctx;
+  const session = fightSessions.get(char.id);
+  if (!session || session.location !== ctx.location || !['fight', 'boss'].includes(session.phase)) {
+    return res.status(400).json({ error: 'Нет активного боя.' });
+  }
+
+  const alive = session.enemies.filter((e) => e.hp > 0);
+  const target = alive.find((e) => e.id === req.body.targetId) || alive[0];
+  const bonuses = getEquipmentBonuses(char.equipment);
+  const log = [];
+
+  const crit = Math.random() < 0.1;
+  const base = randInt(1, 6) + char.str + bonuses.str + Math.floor(char.level / 2);
+  const damage = Math.max(1, (crit ? base * 2 : base) - target.def);
+  target.hp = Math.max(0, target.hp - damage);
+  log.push(crit
+    ? `Вы нанесли критический удар! ${damage} урона`
+    : `Вы атаковали ${target.name} на ${damage} урона`);
+
+  if (target.hp <= 0) {
+    log.push(target.isBoss ? 'Босс повержен!' : 'Враг повержен!');
+    if (!target.isBoss) {
+      char.kills += 1;
+      grantReward(char, target, log, { equipmentChance: session.location === 'cave' ? 0.3 : 0.2, equipmentRarity: 'common' });
+      updateQuests(char);
+    }
+  }
+
+  for (const enemy of session.enemies.filter((e) => e.hp > 0)) {
+    const hit = Math.max(1, enemy.atk + randInt(0, 3) - Math.floor((char.agi + bonuses.agi) / 3));
+    char.hp = Math.max(0, char.hp - hit);
+    log.push(`${enemy.name} атаковал вас на ${hit} урона`);
+    if (char.hp <= 0) break;
+  }
+
+  if (char.hp <= 0) {
+    session.phase = 'defeated';
+    log.push('Вы повержены!');
+  } else if (session.enemies.every((e) => e.hp <= 0)) {
+    if (session.location === 'forest') session.phase = 'cleared';
+    else session.phase = session.enemies[0].isBoss ? 'boss_cleared' : 'group_cleared';
+  }
+
+  await saveCharacter(char);
+  res.json(fightPayload(char, session, log));
+});
+
+app.post('/api/fight/flee', async (req, res) => {
+  const ctx = await loadFightContext(req, res, req.body);
+  if (!ctx) return;
+  const { char } = ctx;
+  fightSessions.delete(char.id);
+  if (char.hp <= 0) char.hp = 1;
+  char.location = 'town';
+  await saveCharacter(char);
+  res.json({ fled: true, character: stripPassword(withEquipmentBonuses(char)) });
+});
+
+app.post('/api/fight/defeat', async (req, res) => {
+  const ctx = await loadFightContext(req, res, req.body);
+  if (!ctx) return;
+  const { char } = ctx;
+  const session = fightSessions.get(char.id);
+  if (!session || session.phase !== 'defeated') return res.status(400).json({ error: 'Вы не повержены.' });
+
+  const maxHp = char.maxHp + getEquipmentBonuses(char.equipment).maxHp;
+  char.hp = Math.max(1, Math.floor(maxHp / 2));
+  char.location = 'town';
+  fightSessions.delete(char.id);
+  await saveCharacter(char);
+  res.json({ restored: true, character: stripPassword(withEquipmentBonuses(char)) });
+});
+
+app.post('/api/fight/bosses/defeat', async (req, res) => {
+  const ctx = await loadFightContext(req, res, req.body);
+  if (!ctx) return;
+  const { char } = ctx;
+  const session = fightSessions.get(char.id);
+  if (!session || session.phase !== 'boss_cleared') return res.status(400).json({ error: 'Награда недоступна.' });
+
+  const boss = session.enemies[0];
+  const log = ['Босс повержен! Вы победили пещеру!'];
+  char.kills += 1;
+  grantReward(char, boss, log, { equipmentChance: 1, equipmentRarity: 'rare' });
+  updateQuests(char);
+  char.location = 'town';
+  fightSessions.delete(char.id);
+  await saveCharacter(char);
+  res.json({ log, character: stripPassword(withEquipmentBonuses(char)) });
+});
+
+const PAGES = { '/city': 'city.html', '/forest': 'forest.html', '/cave': 'cave.html', '/character': 'character.html', '/fight': 'fight.html' };
+for (const [route, file] of Object.entries(PAGES)) {
+  app.get(route, (req, res) => res.sendFile(path.join(__dirname, 'public', file)));
+}
+
 app.get('/api/equipment', async (req, res) => {
   const id = req.query.id;
   if (!id) return res.status(400).json({ error: 'Нужно id персонажа.' });

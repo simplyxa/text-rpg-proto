@@ -10,20 +10,23 @@
   <div class="page-shell">
     <div class="panel character-page">
       <div class="auth-header">
-        <span class="eyebrow">Город</span>
-        <h1 id="cityTitle">Загрузка...</h1>
+        <span class="eyebrow" id="heroName"></span>
+        <h1 id="cityTitle">Город</h1>
       </div>
 
       <div class="content-box">
         <p>Вы в городе. Выберите действие:</p>
 
+        <ul class="location-list">
+          <li><a href="/forest">Лес</a> — тёмный лес, одиночные враги.</li>
+          <li><a href="/cave">Пещера</a> — группа врагов и босс.</li>
+        </ul>
+
         <div class="button-column">
-          <button class="primary-btn" data-action="forest" type="button">Лес</button>
-          <button class="primary-btn" data-action="cave" type="button">Пещера</button>
           <button class="primary-btn" data-action="shop" type="button">Магазин</button>
           <button class="primary-btn" data-action="inventory" type="button">Инвентарь</button>
           <button class="primary-btn" data-action="quests" type="button">Квесты</button>
-          <button class="primary-btn" data-action="profile" type="button">Профиль</button>
+          <button class="primary-btn" data-action="profile" type="button">Персонаж</button>
         </div>
       </div>
     </div>
