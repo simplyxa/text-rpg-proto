@@ -50,13 +50,13 @@ body {
 .experience-bar-container {
   position: fixed;
   z-index: 9999;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 10px;
-  border-bottom: 1px solid rgba(168, 85, 247, 0.2);
-  background: rgba(10, 10, 10, 0.5);
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+  top: 4px;
+  right: 8px;
+  left: 8px;
+  height: 7px;
+  border: 1px solid rgba(143, 190, 114, 0.32);
+  border-radius: 5px;
+  background: #252922;
   pointer-events: none;
 }
 
@@ -65,23 +65,21 @@ body {
   top: 0;
   left: 0;
   height: 100%;
-  background: linear-gradient(90deg, #7c3aed 0%, #a855f7 50%, #00ffff 100%);
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.4), inset 0 0 8px rgba(168, 85, 247, 0.3);
+  border-radius: 4px;
+  background: linear-gradient(90deg, #547b3e, #a0ce70);
   transition: width 0.6s ease;
 }
 
 .experience-percentage {
   position: absolute;
   z-index: 1;
-  top: 50%;
-  right: 10px;
-  color: #00ffff;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-shadow: 0 0 5px #00ffff;
+  top: 100%;
+  right: 2px;
+  margin-top: 2px;
+  color: #8ecbd6;
+  font-size: 0.72rem;
+  line-height: 1;
   white-space: nowrap;
-  transform: translateY(-50%);
 }
 
 .experience-bar-fill.level-up {
@@ -1950,20 +1948,13 @@ a.secondary-btn {
 }
 
 @keyframes levelUpFlash {
-  0% {
-    background: linear-gradient(90deg, #7c3aed, #a855f7, #00ffff);
-    box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
-    transform: scaleY(1);
+  0%, 100% {
+    background: linear-gradient(90deg, #547b3e, #a0ce70);
+    box-shadow: none;
   }
   50% {
-    background: linear-gradient(90deg, #00ffff, #00ffff, #fff);
-    box-shadow: 0 0 30px rgba(0, 255, 255, 1), 0 0 50px rgba(168, 85, 247, 0.8);
-    transform: scaleY(1.5);
-  }
-  100% {
-    background: linear-gradient(90deg, #7c3aed, #a855f7, #00ffff);
-    box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
-    transform: scaleY(1);
+    background: linear-gradient(90deg, #a0ce70, #c6e69b);
+    box-shadow: 0 0 10px rgba(160, 206, 112, 0.8);
   }
 }
 
