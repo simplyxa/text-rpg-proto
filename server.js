@@ -54,6 +54,8 @@ const SHOP_EQUIPMENT = [
 ];
 const SHOP_ITEM_PRICE = 1500;
 const SHOP_SET_PRICE = 10000;
+const ENHANCEMENT_COSTS = [100, 200, 300, 500, 800, 1200, 1800, 2500, 3500, 5000];
+const ENHANCEMENT_CHANCES = [100, 95, 90, 85, 80, 70, 60, 50, 40, 30];
 const LEGACY_SLOT_ARMOR = {
   helmet: 2,
   ring: 1,
@@ -71,9 +73,18 @@ function createEquipmentItem(id, name, slot, rarity, statBonus) {
     name,
     slot,
     rarity,
+    enhancement: 0,
     statBonus: { str: 0, agi: 0, int: 0, maxHp: 0, armor: 0, ...statBonus },
     icon: `/equipment-icons.svg#${slot}`
   };
+}
+
+function normalizeEnhancementLevel(level) {
+  return Math.min(10, Math.max(0, Math.floor(Number(level) || 0)));
+}
+
+function getEnhancedStat(baseStat, enhancementLevel) {
+  return (Number(baseStat) || 0) * (1 + normalizeEnhancementLevel(enhancementLevel) * 0.1);
 }
 
 function createDefaultEquipment() {
@@ -103,15 +114,17 @@ function getEquipmentBonuses(equipment = {}) {
   for (const slot of EQUIPMENT_SLOTS) {
     const item = equipment[slot];
     if (!item || !item.statBonus) continue;
-    for (const stat of Object.keys(bonuses).filter((key) => key !== 'armor')) {
+    for (const stat of Object.keys(bonuses).filter((key) => key !== 'armor' && key !== 'str')) {
       bonuses[stat] += Number(item.statBonus[stat]) || 0;
     }
+    bonuses.str += getEnhancedStat(item.statBonus.str, item.enhancement);
     const shopItem = SHOP_EQUIPMENT.find((template) =>
       item.name === template.name || item.id === template.id || item.id?.startsWith(`${template.id}_`)
     );
-    bonuses.armor += Object.hasOwn(item.statBonus, 'armor')
+    const baseArmor = Object.hasOwn(item.statBonus, 'armor')
       ? Number(item.statBonus.armor) || 0
       : shopItem?.statBonus.armor ?? LEGACY_SLOT_ARMOR[slot] ?? 0;
+    bonuses.armor += getEnhancedStat(baseArmor, item.enhancement);
   }
   return bonuses;
 }
@@ -489,6 +502,9 @@ function deserializeCharacter(row) {
   if (!equipment || typeof equipment !== 'object' || Array.isArray(equipment)) equipment = {};
   for (const slot of EQUIPMENT_SLOTS) {
     if (!(slot in equipment)) equipment[slot] = null;
+    if (equipment[slot]) {
+      equipment[slot].enhancement = normalizeEnhancementLevel(equipment[slot].enhancement);
+    }
   }
   let potionEffects = row.potioneffects;
   if (typeof potionEffects === 'string') {
@@ -825,7 +841,7 @@ app.post('/api/fight', async (req, res) => {
     if (monster.hp <= 0) break;
 
     const baseMonsterDamage = Math.max(1, monster.atk + randInt(0, 3) - Math.floor((char.agi + equipmentBonuses.agi) / 3));
-    const monsterDamage = calculateDamageAfterArmor(baseMonsterDamage, potionBonuses.armor);
+    const monsterDamage = calculateDamageAfterArmor(baseMonsterDamage, equipmentBonuses.armor + potionBonuses.armor);
     char.hp -= monsterDamage;
     log.push(`${monster.name} наносит ${monsterDamage} урона ${char.name}.`);
   }
@@ -1134,6 +1150,7 @@ const PAGES = {
   '/fight': 'fight.html',
   '/inventory': 'inventory.html',
   '/equipment': 'equipment.html',
+  '/enhancement': 'enhancement.html',
   '/shop': 'shop.html'
 };
 for (const [route, file] of Object.entries(PAGES)) {
@@ -1201,6 +1218,37 @@ app.post('/api/unequipItem', async (req, res) => {
     inventory: char.inventory.filter((inventoryItem) => inventoryItem.slot && EQUIPMENT_SLOTS.includes(inventoryItem.slot)),
     bonuses: getEquipmentBonuses(char.equipment),
     message: `Снято: ${item.name}. Предмет возвращён в инвентарь.`
+  });
+});
+
+app.post('/api/enhanceItem', async (req, res) => {
+  const { id, slot } = req.body;
+  if (!id || !EQUIPMENT_SLOTS.includes(slot)) {
+    return res.status(400).json({ error: 'Неверный персонаж или слот снаряжения.' });
+  }
+
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+
+  const item = char.equipment[slot];
+  if (!item) return res.status(400).json({ error: 'В этом слоте нет предмета.' });
+  const enhancement = normalizeEnhancementLevel(item.enhancement);
+  if (enhancement >= 10) return res.status(400).json({ error: 'Предмет уже максимально усилен!' });
+
+  const cost = ENHANCEMENT_COSTS[enhancement];
+  if (char.gold < cost) {
+    return res.status(400).json({ error: `Не хватает золота! Нужно: ${cost}, Есть: ${char.gold}` });
+  }
+
+  char.gold -= cost;
+  const success = Math.random() * 100 < ENHANCEMENT_CHANCES[enhancement];
+  if (success) item.enhancement = enhancement + 1;
+
+  await saveCharacter(char);
+  res.json({
+    character: stripPassword(withEquipmentBonuses(char)),
+    success,
+    message: success ? `Усиление успешно! ${item.name} теперь +${item.enhancement}` : 'Усиление не удалось!'
   });
 });
 

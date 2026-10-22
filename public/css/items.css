@@ -49,3 +49,19 @@
   gap: 8px;
   margin-top: 12px;
 }
+
+.equipped-item-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.enhancement-level,
+.enhancement-high {
+  color: #00ffff;
+  font-weight: 700;
+}
+
+.enhancement-high {
+  color: #4ade80;
+}

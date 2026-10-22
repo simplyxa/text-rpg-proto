@@ -82,10 +82,16 @@ function renderCharacterPage(savedCharacter = restoreSessionState()) {
     const icons = document.createElement('div');
     icons.className = 'equipped-icons';
     equippedItems.forEach((item) => {
-      const icon = createItemIcon(item, 'inventory');
-      if (!icon) return;
-      icon.title = item.name;
-      icons.append(icon);
+      const equippedItem = document.createElement('span');
+      equippedItem.className = 'equipped-item-label';
+      const icon = createItemIcon(item, 'equipment');
+      if (icon) equippedItem.append(icon);
+      const label = document.createElement('span');
+      const enhancement = Math.min(10, Math.max(0, Math.floor(Number(item.enhancement) || 0)));
+      label.textContent = `${item.name} +${enhancement}`;
+      if (enhancement >= 5) label.classList.add('enhancement-high');
+      equippedItem.append(label);
+      icons.append(equippedItem);
     });
     equipmentSection.append(icons);
   }
