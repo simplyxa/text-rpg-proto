@@ -60,6 +60,49 @@ function getFactionName(factionId) {
   return FACTION_NAMES[factionId] || factionId || 'Светлые';
 }
 
+function applyCharacterBonuses(character) {
+  if (!character) return character;
+
+  const savedBase = character.baseStats || {
+    str: Number(character.str) || 0,
+    agi: Number(character.agi) || 0,
+    int: Number(character.int) || 0,
+    maxHp: Number(character.maxHp) || 0,
+    hp: Number(character.hp) || 0
+  };
+
+  character.baseStats = { ...savedBase };
+
+  const classBonus = {
+    warrior: { str: 2, agi: 1, int: 0, maxHp: 12, hp: 12 },
+    healer: { str: 0, agi: 1, int: 2, maxHp: 20, hp: 20 },
+    mage: { str: 0, agi: 1, int: 3, maxHp: 10, hp: 10 }
+  }[character.classId] || { str: 0, agi: 0, int: 0, maxHp: 0, hp: 0 };
+
+  const factionBonus = {
+    light: { str: 1, agi: 1, int: 2, maxHp: 10, hp: 10 },
+    dark: { str: 2, agi: 2, int: 0, maxHp: 8, hp: 8 }
+  }[(character.faction || 'light')] || { str: 0, agi: 0, int: 0, maxHp: 0, hp: 0 };
+
+  const str = savedBase.str + classBonus.str + factionBonus.str;
+  const agi = savedBase.agi + classBonus.agi + factionBonus.agi;
+  const int = savedBase.int + classBonus.int + factionBonus.int;
+  const maxHp = savedBase.maxHp + classBonus.maxHp + factionBonus.maxHp;
+  const hp = Math.max(1, (savedBase.hp || savedBase.maxHp || 0) + classBonus.hp + factionBonus.hp);
+
+  character.str = str;
+  character.agi = agi;
+  character.int = int;
+  character.maxHp = maxHp;
+  character.hp = Math.min(hp, maxHp);
+
+  return character;
+}
+
+function getFactionClass(factionId) {
+  return (factionId || 'light').toLowerCase();
+}
+
 function saveSessionState() {
   if (currentId && currentCharacter) {
     localStorage.setItem(STORAGE_ID_KEY, String(currentId));
@@ -100,6 +143,7 @@ function restoreSessionState() {
 
     currentId = savedId;
     currentCharacter = parsed;
+    applyCharacterBonuses(currentCharacter);
     return true;
   } catch {
     clearSessionState();
@@ -151,52 +195,60 @@ function goToCityPage() {
 }
 
 function renderCharacter(c) {
-  currentCharacter = c;
-  currentId = c.id;
+  if (!c) return;
+
+  if (!c.faction) c.faction = 'light';
+  if (!c.classId) c.classId = 'warrior';
+
+  currentCharacter = applyCharacterBonuses(c);
+  currentId = currentCharacter.id;
   saveSessionState();
 
-  const className = getClassName(c.classId);
-  const factionName = getFactionName(c.faction || 'light');
+  const className = getClassName(currentCharacter.classId);
+  const factionName = getFactionName(currentCharacter.faction || 'light');
+  const factionClass = getFactionClass(currentCharacter.faction || 'light');
 
   statsDiv.innerHTML = `
-    <strong>${c.name}</strong> (${className})<br>
-    Фракция: ${factionName}<br>
-    Уровень: ${c.level}<br>
-    HP: ${c.hp}/${c.maxHp}<br>
-    Сила: ${c.str} | Ловкость: ${c.agi} | Интеллект: ${c.int}<br>
-    Опыт: ${c.xp}/${c.xpToNext}<br>
-    Золото: ${c.gold}<br>
-    Локация: ${c.location}
+    <strong>${currentCharacter.name}</strong> (${className})<br>
+    Фракция: <span class="faction-tag ${factionClass}">${factionName}</span><br>
+    Уровень: ${currentCharacter.level}<br>
+    HP: ${currentCharacter.hp}/${currentCharacter.maxHp}<br>
+    Сила: ${currentCharacter.str} | Ловкость: ${currentCharacter.agi} | Интеллект: ${currentCharacter.int}<br>
+    Опыт: ${currentCharacter.xp}/${currentCharacter.xpToNext}<br>
+    Золото: ${currentCharacter.gold}<br>
+    Локация: ${currentCharacter.location}
   `;
 
+  profileContent.classList.remove('light', 'dark');
+  profileContent.classList.add(factionClass);
   profileContent.innerHTML = `
     <h3>Профиль героя</h3>
-    <p><strong>Ник:</strong> ${c.name}</p>
+    <p><strong>Ник:</strong> ${currentCharacter.name}</p>
     <p><strong>Класс:</strong> ${className}</p>
-    <p><strong>Фракция:</strong> ${factionName}</p>
-    <p><strong>Уровень:</strong> ${c.level}</p>
-    <p><strong>HP:</strong> ${c.hp}/${c.maxHp}</p>
-    <p><strong>Сила:</strong> ${c.str}</p>
-    <p><strong>Ловкость:</strong> ${c.agi}</p>
-    <p><strong>Интеллект:</strong> ${c.int}</p>
-    <p><strong>Опыт:</strong> ${c.xp}/${c.xpToNext}</p>
-    <p><strong>Золото:</strong> ${c.gold}</p>
-    <p><strong>Локация:</strong> ${c.location}</p>
+    <p><strong>Фракция:</strong> <span class="faction-tag ${factionClass}">${factionName}</span></p>
+    <p><strong>Уровень:</strong> ${currentCharacter.level}</p>
+    <p><strong>HP:</strong> ${currentCharacter.hp}/${currentCharacter.maxHp}</p>
+    <p><strong>Сила:</strong> ${currentCharacter.str}</p>
+    <p><strong>Ловкость:</strong> ${currentCharacter.agi}</p>
+    <p><strong>Интеллект:</strong> ${currentCharacter.int}</p>
+    <p><strong>Опыт:</strong> ${currentCharacter.xp}/${currentCharacter.xpToNext}</p>
+    <p><strong>Золото:</strong> ${currentCharacter.gold}</p>
+    <p><strong>Локация:</strong> ${currentCharacter.location}</p>
 
     <label>
       <span>Сменить класс</span>
       <select id="classSelect">
-        <option value="warrior" ${c.classId === 'warrior' ? 'selected' : ''}>Воин</option>
-        <option value="healer" ${c.classId === 'healer' ? 'selected' : ''}>Лекарь</option>
-        <option value="mage" ${c.classId === 'mage' ? 'selected' : ''}>Маг</option>
+        <option value="warrior" ${currentCharacter.classId === 'warrior' ? 'selected' : ''}>Воин</option>
+        <option value="healer" ${currentCharacter.classId === 'healer' ? 'selected' : ''}>Лекарь</option>
+        <option value="mage" ${currentCharacter.classId === 'mage' ? 'selected' : ''}>Маг</option>
       </select>
     </label>
 
     <label>
       <span>Сменить фракцию</span>
       <select id="factionSelect">
-        <option value="light" ${(c.faction || 'light') === 'light' ? 'selected' : ''}>Светлые</option>
-        <option value="dark" ${(c.faction || 'light') === 'dark' ? 'selected' : ''}>Тёмные</option>
+        <option value="light" ${(currentCharacter.faction || 'light') === 'light' ? 'selected' : ''}>Светлые</option>
+        <option value="dark" ${(currentCharacter.faction || 'light') === 'dark' ? 'selected' : ''}>Тёмные</option>
       </select>
     </label>
 
@@ -216,6 +268,7 @@ function renderCharacter(c) {
 
       currentCharacter.classId = nextClass;
       currentCharacter.faction = nextFaction;
+      applyCharacterBonuses(currentCharacter);
       saveSessionState();
       renderCharacter(currentCharacter);
       setLog(`Класс изменён на ${getClassName(nextClass)}. Фракция: ${getFactionName(nextFaction)}.`);
@@ -224,7 +277,7 @@ function renderCharacter(c) {
 
   if (logoutBtn) logoutBtn.onclick = logoutGame;
 
-  gameStatus.textContent = `Игрок: ${c.name} • ${getFactionName(c.faction || 'light')} • ${className} • Уровень ${c.level}`;
+  gameStatus.textContent = `Игрок: ${currentCharacter.name} • ${factionName} • ${className} • Уровень ${currentCharacter.level}`;
   showGameScreen();
 }
 
@@ -237,8 +290,9 @@ function renderCharacterList(list) {
   }
 
   list.forEach((char) => {
+    const factionClass = getFactionClass(char.faction || 'light');
     const item = document.createElement('button');
-    item.className = 'character-item';
+    item.className = `character-item ${factionClass}`;
     item.innerHTML = `
       <strong>${char.name}</strong>
       <div class="character-meta">${getClassName(char.classId)} • ${getFactionName(char.faction || 'light')} • LV ${char.level}</div>
@@ -248,8 +302,8 @@ function renderCharacterList(list) {
       const res = await api(`/api/character?id=${encodeURIComponent(char.id)}`);
       if (res.error) return alert(res.error);
 
-      currentCharacter = res.character;
-      currentId = res.character.id;
+      currentCharacter = applyCharacterBonuses({ ...res.character, faction: res.character.faction || 'light' });
+      currentId = currentCharacter.id;
       saveSessionState();
       goToCityPage();
     };
@@ -266,7 +320,7 @@ async function loadCharacters() {
 async function createCharacter() {
   const nickname = newNicknameInput.value.trim();
   const classId = newClassInput.value;
-  const faction = newFactionInput.value;
+  const faction = newFactionInput.value || 'light';
   const password = newPasswordInput.value.trim();
 
   if (!nickname) return alert('Введите уникальный ник');
@@ -280,8 +334,9 @@ async function createCharacter() {
 
   if (res.error) return alert(res.error);
 
-  currentCharacter = res.character;
-  currentId = res.character.id;
+  const nextCharacter = applyCharacterBonuses({ ...res.character, faction: res.character.faction || faction });
+  currentCharacter = nextCharacter;
+  currentId = currentCharacter.id;
   saveSessionState();
   goToCityPage();
 }
@@ -300,8 +355,9 @@ async function loginCharacter() {
 
   if (res.error) return alert(res.error);
 
-  currentCharacter = res.character;
-  currentId = res.character.id;
+  const nextCharacter = applyCharacterBonuses({ ...res.character, faction: res.character.faction || 'light' });
+  currentCharacter = nextCharacter;
+  currentId = currentCharacter.id;
   saveSessionState();
   goToCityPage();
 }
@@ -324,9 +380,9 @@ async function travel(to) {
 
   if (res.error) return alert(res.error);
 
-  currentCharacter = res.character;
+  currentCharacter = applyCharacterBonuses({ ...res.character, faction: currentCharacter.faction || 'light' });
   saveSessionState();
-  renderCharacter(res.character);
+  renderCharacter(currentCharacter);
   setLog(`Вы переместились в ${res.location.name}. ${res.location.description}`);
 }
 
@@ -343,9 +399,9 @@ async function fight() {
 
   if (res.log) setLog(res.log.join('\n'));
   if (res.character) {
-    currentCharacter = res.character;
+    currentCharacter = applyCharacterBonuses({ ...res.character, faction: currentCharacter.faction || 'light' });
     saveSessionState();
-    renderCharacter(res.character);
+    renderCharacter(currentCharacter);
   }
 
   if (res.victory === true) {
@@ -390,9 +446,9 @@ async function renderInventoryTab() {
 
       if (useRes.error) return alert(useRes.error);
       setLog(useRes.message || 'Предмет использован');
-      currentCharacter = useRes.character;
+      currentCharacter = applyCharacterBonuses({ ...useRes.character, faction: currentCharacter.faction || 'light' });
       saveSessionState();
-      renderCharacter(useRes.character);
+      renderCharacter(currentCharacter);
       renderInventoryTab();
     };
   });
@@ -448,9 +504,9 @@ async function renderShopTab() {
 
     if (res.error) return alert(res.error);
     setLog(res.message || 'Покупка совершена.');
-    currentCharacter = res.character;
+    currentCharacter = applyCharacterBonuses({ ...res.character, faction: currentCharacter.faction || 'light' });
     saveSessionState();
-    renderCharacter(res.character);
+    renderCharacter(currentCharacter);
     renderShopTab();
     renderInventoryTab();
   };

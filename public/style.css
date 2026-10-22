@@ -290,7 +290,7 @@ button:active {
 
 .character-item {
   width: 100%;
-  max-width: 220px;
+  max-width: 240px;
   text-align: left;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
@@ -298,12 +298,23 @@ button:active {
   border-radius: 12px;
   color: white;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .character-item:hover {
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.16);
+  transform: translateY(-1px);
+}
+
+.character-item.light {
+  background: linear-gradient(180deg, rgba(94, 145, 190, 0.18), rgba(24, 39, 52, 0.9));
+  border-color: rgba(136, 191, 236, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(160, 210, 255, 0.06);
+}
+
+.character-item.dark {
+  background: linear-gradient(180deg, rgba(110, 66, 120, 0.22), rgba(27, 16, 26, 0.9));
+  border-color: rgba(199, 120, 255, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(255, 140, 220, 0.06);
 }
 
 .character-item strong {
@@ -315,6 +326,42 @@ button:active {
 .character-meta {
   font-size: 0.82rem;
   color: #c7d7e4;
+}
+
+.faction-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.faction-tag.light {
+  background: rgba(108, 172, 233, 0.18);
+  color: #dceeff;
+  border-color: rgba(118, 176, 230, 0.36);
+}
+
+.faction-tag.dark {
+  background: rgba(167, 96, 229, 0.14);
+  color: #f2d9ff;
+  border-color: rgba(198, 122, 255, 0.36);
+}
+
+.profile-content.light,
+#profileContent.light {
+  border-color: rgba(118, 176, 230, 0.34);
+  background: rgba(21, 35, 46, 0.82);
+}
+
+.profile-content.dark,
+#profileContent.dark {
+  border-color: rgba(198, 122, 255, 0.3);
+  background: rgba(28, 18, 32, 0.84);
 }
 
 .panel {
@@ -401,6 +448,20 @@ button:active {
   border-radius: 10px;
   padding: 14px;
   min-height: 160px;
+}
+
+#profileContent {
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+#profileContent.light {
+  border-color: rgba(118, 176, 230, 0.34);
+  background: rgba(21, 35, 46, 0.82);
+}
+
+#profileContent.dark {
+  border-color: rgba(198, 122, 255, 0.3);
+  background: rgba(28, 18, 32, 0.84);
 }
 
 .log {
