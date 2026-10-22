@@ -528,6 +528,13 @@ button:active {
   flex: 1;
 }
 
+.inventory-equipment-icon {
+  width: 22px;
+  height: 22px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
 .small-btn {
   padding: 8px 10px;
   font-size: 0.9rem;
@@ -553,6 +560,16 @@ button:active {
   border: 1px solid rgba(255,255,255,0.09);
   border-radius: 12px;
   background: rgba(255,255,255,0.025);
+}
+
+.equipment-success {
+  animation: equipment-success 700ms ease-out;
+}
+
+@keyframes equipment-success {
+  0% { box-shadow: 0 0 0 rgba(192,132,252,0); }
+  35% { box-shadow: 0 0 22px rgba(192,132,252,0.8); }
+  100% { box-shadow: 0 0 0 rgba(192,132,252,0); }
 }
 
 .equipment-slot-heading {
