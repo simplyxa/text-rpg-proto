@@ -52,6 +52,17 @@ const FACTION_NAMES = {
   dark: 'Тёмные'
 };
 
+const CLASS_BONUSES = {
+  warrior: { str: 2, agi: 1, int: 0, maxHp: 12, hp: 12 },
+  healer: { str: 0, agi: 1, int: 2, maxHp: 18, hp: 18 },
+  mage: { str: 0, agi: 1, int: 3, maxHp: 10, hp: 10 }
+};
+
+const FACTION_BONUSES = {
+  light: { str: 1, agi: 1, int: 2, maxHp: 8, hp: 8 },
+  dark: { str: 2, agi: 2, int: 0, maxHp: 6, hp: 6 }
+};
+
 function getClassName(classId) {
   return CLASS_NAMES[classId] || classId || 'Воин';
 }
@@ -60,10 +71,35 @@ function getFactionName(factionId) {
   return FACTION_NAMES[factionId] || factionId || 'Светлые';
 }
 
+function getFactionClass(factionId) {
+  return (factionId || 'light').toLowerCase();
+}
+
+function getCharacterEffectText(character = {}) {
+  const classId = character.classId || 'warrior';
+  const factionId = character.faction || 'light';
+
+  const classEffects = {
+    warrior: 'Мощный удар',
+    healer: 'Лечение',
+    mage: 'Магический всплеск'
+  };
+
+  const factionEffects = {
+    light: 'Свет',
+    dark: 'Тень'
+  };
+
+  return `${classEffects[classId] || 'Мощный удар'} • ${factionEffects[factionId] || 'Свет'}`;
+}
+
 function applyCharacterBonuses(character) {
   if (!character) return character;
 
-  const savedBase = character.baseStats || {
+  const classId = character.classId || 'warrior';
+  const factionId = character.faction || 'light';
+
+  const base = character.baseStats || {
     str: Number(character.str) || 0,
     agi: Number(character.agi) || 0,
     int: Number(character.int) || 0,
@@ -71,36 +107,28 @@ function applyCharacterBonuses(character) {
     hp: Number(character.hp) || 0
   };
 
-  character.baseStats = { ...savedBase };
+  character.baseStats = { ...base };
 
-  const classBonus = {
-    warrior: { str: 2, agi: 1, int: 0, maxHp: 12, hp: 12 },
-    healer: { str: 0, agi: 1, int: 2, maxHp: 20, hp: 20 },
-    mage: { str: 0, agi: 1, int: 3, maxHp: 10, hp: 10 }
-  }[character.classId] || { str: 0, agi: 0, int: 0, maxHp: 0, hp: 0 };
+  const classBonus = CLASS_BONUSES[classId] || { str: 0, agi: 0, int: 0, maxHp: 0, hp: 0 };
+  const factionBonus = FACTION_BONUSES[factionId] || { str: 0, agi: 0, int: 0, maxHp: 0, hp: 0 };
 
-  const factionBonus = {
-    light: { str: 1, agi: 1, int: 2, maxHp: 10, hp: 10 },
-    dark: { str: 2, agi: 2, int: 0, maxHp: 8, hp: 8 }
-  }[(character.faction || 'light')] || { str: 0, agi: 0, int: 0, maxHp: 0, hp: 0 };
+  const nextStr = base.str + classBonus.str + factionBonus.str;
+  const nextAgi = base.agi + classBonus.agi + factionBonus.agi;
+  const nextInt = base.int + classBonus.int + factionBonus.int;
+  const nextMaxHp = base.maxHp + classBonus.maxHp + factionBonus.maxHp;
+  const nextHp = Math.min(
+    Math.max(base.hp + classBonus.hp + factionBonus.hp, 1),
+    Math.max(nextMaxHp, 1)
+  );
 
-  const str = savedBase.str + classBonus.str + factionBonus.str;
-  const agi = savedBase.agi + classBonus.agi + factionBonus.agi;
-  const int = savedBase.int + classBonus.int + factionBonus.int;
-  const maxHp = savedBase.maxHp + classBonus.maxHp + factionBonus.maxHp;
-  const hp = Math.max(1, (savedBase.hp || savedBase.maxHp || 0) + classBonus.hp + factionBonus.hp);
-
-  character.str = str;
-  character.agi = agi;
-  character.int = int;
-  character.maxHp = maxHp;
-  character.hp = Math.min(hp, maxHp);
+  character.str = nextStr;
+  character.agi = nextAgi;
+  character.int = nextInt;
+  character.maxHp = nextMaxHp;
+  character.hp = nextHp;
+  character.effectText = getCharacterEffectText(character);
 
   return character;
-}
-
-function getFactionClass(factionId) {
-  return (factionId || 'light').toLowerCase();
 }
 
 function saveSessionState() {
@@ -142,8 +170,7 @@ function restoreSessionState() {
     }
 
     currentId = savedId;
-    currentCharacter = parsed;
-    applyCharacterBonuses(currentCharacter);
+    currentCharacter = applyCharacterBonuses({ ...parsed, faction: parsed.faction || 'light' });
     return true;
   } catch {
     clearSessionState();
@@ -197,58 +224,63 @@ function goToCityPage() {
 function renderCharacter(c) {
   if (!c) return;
 
-  if (!c.faction) c.faction = 'light';
-  if (!c.classId) c.classId = 'warrior';
+  const safeC = applyCharacterBonuses({
+    ...c,
+    faction: c.faction || 'light',
+    classId: c.classId || 'warrior'
+  });
 
-  currentCharacter = applyCharacterBonuses(c);
-  currentId = currentCharacter.id;
+  currentCharacter = safeC;
+  currentId = safeC.id;
   saveSessionState();
 
-  const className = getClassName(currentCharacter.classId);
-  const factionName = getFactionName(currentCharacter.faction || 'light');
-  const factionClass = getFactionClass(currentCharacter.faction || 'light');
+  const className = getClassName(safeC.classId);
+  const factionName = getFactionName(safeC.faction || 'light');
+  const factionClass = getFactionClass(safeC.faction || 'light');
 
   statsDiv.innerHTML = `
-    <strong>${currentCharacter.name}</strong> (${className})<br>
+    <strong>${safeC.name}</strong> (${className})<br>
     Фракция: <span class="faction-tag ${factionClass}">${factionName}</span><br>
-    Уровень: ${currentCharacter.level}<br>
-    HP: ${currentCharacter.hp}/${currentCharacter.maxHp}<br>
-    Сила: ${currentCharacter.str} | Ловкость: ${currentCharacter.agi} | Интеллект: ${currentCharacter.int}<br>
-    Опыт: ${currentCharacter.xp}/${currentCharacter.xpToNext}<br>
-    Золото: ${currentCharacter.gold}<br>
-    Локация: ${currentCharacter.location}
+    Эффект: <span class="effect-pill">${safeC.effectText}</span><br>
+    Уровень: ${safeC.level}<br>
+    HP: ${safeC.hp}/${safeC.maxHp}<br>
+    Сила: ${safeC.str} | Ловкость: ${safeC.agi} | Интеллект: ${safeC.int}<br>
+    Опыт: ${safeC.xp}/${safeC.xpToNext}<br>
+    Золото: ${safeC.gold}<br>
+    Локация: ${safeC.location}
   `;
 
   profileContent.classList.remove('light', 'dark');
   profileContent.classList.add(factionClass);
   profileContent.innerHTML = `
     <h3>Профиль героя</h3>
-    <p><strong>Ник:</strong> ${currentCharacter.name}</p>
+    <p><strong>Ник:</strong> ${safeC.name}</p>
     <p><strong>Класс:</strong> ${className}</p>
     <p><strong>Фракция:</strong> <span class="faction-tag ${factionClass}">${factionName}</span></p>
-    <p><strong>Уровень:</strong> ${currentCharacter.level}</p>
-    <p><strong>HP:</strong> ${currentCharacter.hp}/${currentCharacter.maxHp}</p>
-    <p><strong>Сила:</strong> ${currentCharacter.str}</p>
-    <p><strong>Ловкость:</strong> ${currentCharacter.agi}</p>
-    <p><strong>Интеллект:</strong> ${currentCharacter.int}</p>
-    <p><strong>Опыт:</strong> ${currentCharacter.xp}/${currentCharacter.xpToNext}</p>
-    <p><strong>Золото:</strong> ${currentCharacter.gold}</p>
-    <p><strong>Локация:</strong> ${currentCharacter.location}</p>
+    <p><strong>Эффект:</strong> <span class="effect-pill">${safeC.effectText}</span></p>
+    <p><strong>Уровень:</strong> ${safeC.level}</p>
+    <p><strong>HP:</strong> ${safeC.hp}/${safeC.maxHp}</p>
+    <p><strong>Сила:</strong> ${safeC.str}</p>
+    <p><strong>Ловкость:</strong> ${safeC.agi}</p>
+    <p><strong>Интеллект:</strong> ${safeC.int}</p>
+    <p><strong>Опыт:</strong> ${safeC.xp}/${safeC.xpToNext}</p>
+    <p><strong>Золото:</strong> ${safeC.gold}</p>
+    <p><strong>Локация:</strong> ${safeC.location}</p>
 
     <label>
       <span>Сменить класс</span>
       <select id="classSelect">
-        <option value="warrior" ${currentCharacter.classId === 'warrior' ? 'selected' : ''}>Воин</option>
-        <option value="healer" ${currentCharacter.classId === 'healer' ? 'selected' : ''}>Лекарь</option>
-        <option value="mage" ${currentCharacter.classId === 'mage' ? 'selected' : ''}>Маг</option>
+        <option value="warrior" ${safeC.classId === 'warrior' ? 'selected' : ''}>Воин</option>
+        <option value="healer" ${safeC.classId === 'healer' ? 'selected' : ''}>Лекарь</option>
+        <option value="mage" ${safeC.classId === 'mage' ? 'selected' : ''}>Маг</option>
       </select>
     </label>
 
     <label>
       <span>Сменить фракцию</span>
       <select id="factionSelect">
-        <option value="light" ${(currentCharacter.faction || 'light') === 'light' ? 'selected' : ''}>Светлые</option>
-        <option value="dark" ${(currentCharacter.faction || 'light') === 'dark' ? 'selected' : ''}>Тёмные</option>
+        <option value="light" ${(safeC.faction || 'light') === 'light' ? 'selected' : ''}>Светлые</option>
+        <option value="dark" ${(safeC.faction || 'light') === 'dark' ? 'selected' : ''}>Тёмные</option>
       </select>
     </label>
 
@@ -268,7 +300,7 @@ function renderCharacter(c) {
 
       currentCharacter.classId = nextClass;
       currentCharacter.faction = nextFaction;
-      applyCharacterBonuses(currentCharacter);
+      currentCharacter = applyCharacterBonuses(currentCharacter);
       saveSessionState();
       renderCharacter(currentCharacter);
       setLog(`Класс изменён на ${getClassName(nextClass)}. Фракция: ${getFactionName(nextFaction)}.`);
@@ -277,7 +309,7 @@ function renderCharacter(c) {
 
   if (logoutBtn) logoutBtn.onclick = logoutGame;
 
-  gameStatus.textContent = `Игрок: ${currentCharacter.name} • ${factionName} • ${className} • Уровень ${currentCharacter.level}`;
+  gameStatus.textContent = `Игрок: ${safeC.name} • ${factionName} • ${className} • Уровень ${safeC.level}`;
   showGameScreen();
 }
 
@@ -290,12 +322,13 @@ function renderCharacterList(list) {
   }
 
   list.forEach((char) => {
-    const factionClass = getFactionClass(char.faction || 'light');
+    const safeChar = applyCharacterBonuses({ ...char, faction: char.faction || 'light' });
+    const factionClass = getFactionClass(safeChar.faction || 'light');
     const item = document.createElement('button');
     item.className = `character-item ${factionClass}`;
     item.innerHTML = `
-      <strong>${char.name}</strong>
-      <div class="character-meta">${getClassName(char.classId)} • ${getFactionName(char.faction || 'light')} • LV ${char.level}</div>
+      <strong>${safeChar.name}</strong>
+      <div class="character-meta">${getClassName(safeChar.classId)} • ${getFactionName(safeChar.faction || 'light')} • LV ${safeChar.level}</div>
     `;
 
     item.onclick = async () => {
@@ -398,8 +431,25 @@ async function fight() {
   if (res.error) return alert(res.error);
 
   if (res.log) setLog(res.log.join('\n'));
+
+  const nextCharacter = currentCharacter ? { ...currentCharacter } : null;
+  if (nextCharacter && nextCharacter.classId === 'healer') {
+    const healValue = nextCharacter.faction === 'dark' ? 10 : 15;
+    nextCharacter.hp = Math.min(nextCharacter.maxHp, nextCharacter.hp + healValue);
+    appendLog(`\nЛекарь активировал исцеление: +${healValue} HP.`);
+  }
+
+  if (nextCharacter && nextCharacter.faction === 'dark') {
+    appendLog('\nТёмная фракция усиливает тень в вашем ударе.');
+  }
+
   if (res.character) {
     currentCharacter = applyCharacterBonuses({ ...res.character, faction: currentCharacter.faction || 'light' });
+
+    if (nextCharacter && nextCharacter.classId === 'healer') {
+      currentCharacter.hp = Math.min(currentCharacter.maxHp, currentCharacter.hp + 15);
+    }
+
     saveSessionState();
     renderCharacter(currentCharacter);
   }

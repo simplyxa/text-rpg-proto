@@ -464,6 +464,16 @@ button:active {
   background: rgba(28, 18, 32, 0.84);
 }
 
+.effect-pill {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  font-size: 0.72rem;
+  color: #edf8ff;
+}
+
 .log {
   background: #0c161d;
   border: 1px solid rgba(255,255,255,0.06);
