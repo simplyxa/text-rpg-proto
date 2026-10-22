@@ -63,6 +63,56 @@ const FACTION_BONUSES = {
   dark: { str: 2, agi: 2, int: 0, maxHp: 6, hp: 6 }
 };
 
+const CLASS_SKILLS = {
+  warrior: {
+    light: {
+      name: 'Щит Света',
+      description: 'Увеличивает защиту и стабилизирует бой.',
+      type: 'shield'
+    },
+    dark: {
+      name: 'Кровавый натиск',
+      description: 'Наносит сильный тёмный удар и усиливает атаку.',
+      type: 'attack'
+    }
+  },
+  healer: {
+    light: {
+      name: 'Световое исцеление',
+      description: 'Лечит союзника после боя и усиливает восстановление.',
+      type: 'heal'
+    },
+    dark: {
+      name: 'Тёмный оберег',
+      description: 'Лечит часть HP и ослабляет врага тенью.',
+      type: 'heal'
+    }
+  },
+  mage: {
+    light: {
+      name: 'Молния света',
+      description: 'Запускает мощный световой удар по врагу.',
+      type: 'spell'
+    },
+    dark: {
+      name: 'Тёмный всплеск',
+      description: 'Призывает тёмную магию и усиливает урон.',
+      type: 'spell'
+    }
+  }
+};
+
+const FACTION_PASSIVES = {
+  light: {
+    name: 'Пасив: Свет',
+    description: 'Светлые получают дополнительную защиту и стабильное исцеление.'
+  },
+  dark: {
+    name: 'Пасив: Тень',
+    description: 'Тёмные получают усиленный урон и эффект тени в бою.'
+  }
+};
+
 function getClassName(classId) {
   return CLASS_NAMES[classId] || classId || 'Воин';
 }
@@ -75,22 +125,26 @@ function getFactionClass(factionId) {
   return (factionId || 'light').toLowerCase();
 }
 
-function getCharacterEffectText(character = {}) {
+function getActiveSkill(character = {}) {
   const classId = character.classId || 'warrior';
-  const factionId = character.faction || 'light';
+  const faction = character.faction || 'light';
 
-  const classEffects = {
-    warrior: 'Мощный удар',
-    healer: 'Лечение',
-    mage: 'Магический всплеск'
+  return CLASS_SKILLS[classId]?.[faction] || {
+    name: 'Базовый удар',
+    description: 'Обычная атака без усиления.',
+    type: 'basic'
   };
+}
 
-  const factionEffects = {
-    light: 'Свет',
-    dark: 'Тень'
-  };
+function getFactionPassive(character = {}) {
+  const faction = character.faction || 'light';
+  return FACTION_PASSIVES[faction] || FACTION_PASSIVES.light;
+}
 
-  return `${classEffects[classId] || 'Мощный удар'} • ${factionEffects[factionId] || 'Свет'}`;
+function getCharacterEffectText(character = {}) {
+  const skill = getActiveSkill(character);
+  const passive = getFactionPassive(character);
+  return `${skill.name} • ${passive.name}`;
 }
 
 function applyCharacterBonuses(character) {
@@ -127,6 +181,8 @@ function applyCharacterBonuses(character) {
   character.maxHp = nextMaxHp;
   character.hp = nextHp;
   character.effectText = getCharacterEffectText(character);
+  character.skill = getActiveSkill(character);
+  character.passive = getFactionPassive(character);
 
   return character;
 }
@@ -237,11 +293,14 @@ function renderCharacter(c) {
   const className = getClassName(safeC.classId);
   const factionName = getFactionName(safeC.faction || 'light');
   const factionClass = getFactionClass(safeC.faction || 'light');
+  const skill = getActiveSkill(safeC);
+  const passive = getFactionPassive(safeC);
 
   statsDiv.innerHTML = `
     <strong>${safeC.name}</strong> (${className})<br>
     Фракция: <span class="faction-tag ${factionClass}">${factionName}</span><br>
     Эффект: <span class="effect-pill">${safeC.effectText}</span><br>
+    Навык: <strong>${skill.name}</strong><br>
     Уровень: ${safeC.level}<br>
     HP: ${safeC.hp}/${safeC.maxHp}<br>
     Сила: ${safeC.str} | Ловкость: ${safeC.agi} | Интеллект: ${safeC.int}<br>
@@ -258,6 +317,10 @@ function renderCharacter(c) {
     <p><strong>Класс:</strong> ${className}</p>
     <p><strong>Фракция:</strong> <span class="faction-tag ${factionClass}">${factionName}</span></p>
     <p><strong>Эффект:</strong> <span class="effect-pill">${safeC.effectText}</span></p>
+    <p><strong>Навык:</strong> ${skill.name}</p>
+    <p><strong>Описание:</strong> ${skill.description}</p>
+    <p><strong>Пассив:</strong> ${passive.name}</p>
+    <p>${passive.description}</p>
     <p><strong>Уровень:</strong> ${safeC.level}</p>
     <p><strong>HP:</strong> ${safeC.hp}/${safeC.maxHp}</p>
     <p><strong>Сила:</strong> ${safeC.str}</p>
@@ -266,6 +329,11 @@ function renderCharacter(c) {
     <p><strong>Опыт:</strong> ${safeC.xp}/${safeC.xpToNext}</p>
     <p><strong>Золото:</strong> ${safeC.gold}</p>
     <p><strong>Локация:</strong> ${safeC.location}</p>
+
+    <div class="skill-box">
+      <div class="skill-tag">Навык: ${skill.name}</div>
+      <div class="skill-desc">${skill.description}</div>
+    </div>
 
     <label>
       <span>Сменить класс</span>
@@ -419,8 +487,39 @@ async function travel(to) {
   setLog(`Вы переместились в ${res.location.name}. ${res.location.description}`);
 }
 
+function resolveCombatSkill(character) {
+  const skill = getActiveSkill(character);
+  const passive = getFactionPassive(character);
+  const result = { ...character };
+
+  if (skill.type === 'heal') {
+    result.hp = Math.min(result.maxHp, result.hp + 12);
+    if (result.faction === 'light') result.hp = Math.min(result.maxHp, result.hp + 10);
+    if (result.faction === 'dark') result.hp = Math.min(result.maxHp, result.hp + 8);
+  }
+
+  if (skill.type === 'shield') {
+    result.hp = Math.min(result.maxHp, result.hp + 8);
+  }
+
+  if (skill.type === 'attack' || skill.type === 'spell') {
+    result.str = result.str + 2;
+    result.int = result.int + 2;
+  }
+
+  if (passive.name.includes('Тень')) {
+    result.str = result.str + 1;
+    result.agi = result.agi + 1;
+  }
+
+  return result;
+}
+
 async function fight() {
   if (!currentId) return alert('Сначала выберите героя');
+
+  const skill = getActiveSkill(currentCharacter);
+  setLog(`${currentCharacter.name} использует: ${skill.name}. ${skill.description}`);
 
   const res = await api('/api/fight', {
     method: 'POST',
@@ -432,31 +531,19 @@ async function fight() {
 
   if (res.log) setLog(res.log.join('\n'));
 
-  const nextCharacter = currentCharacter ? { ...currentCharacter } : null;
-  if (nextCharacter && nextCharacter.classId === 'healer') {
-    const healValue = nextCharacter.faction === 'dark' ? 10 : 15;
-    nextCharacter.hp = Math.min(nextCharacter.maxHp, nextCharacter.hp + healValue);
-    appendLog(`\nЛекарь активировал исцеление: +${healValue} HP.`);
-  }
-
-  if (nextCharacter && nextCharacter.faction === 'dark') {
-    appendLog('\nТёмная фракция усиливает тень в вашем ударе.');
-  }
-
-  if (res.character) {
-    currentCharacter = applyCharacterBonuses({ ...res.character, faction: currentCharacter.faction || 'light' });
-
-    if (nextCharacter && nextCharacter.classId === 'healer') {
-      currentCharacter.hp = Math.min(currentCharacter.maxHp, currentCharacter.hp + 15);
-    }
-
+  let combatCharacter = currentCharacter ? { ...currentCharacter } : null;
+  if (combatCharacter) {
+    combatCharacter = resolveCombatSkill(combatCharacter);
+    currentCharacter = applyCharacterBonuses({ ...combatCharacter, faction: combatCharacter.faction || 'light' });
     saveSessionState();
     renderCharacter(currentCharacter);
   }
 
   if (res.victory === true) {
+    appendLog(`\nНавык активирован: ${skill.name}. ${skill.description}`);
     appendLog('\nПобеда! Вы получили награду.');
   } else {
+    appendLog(`\nНавык активирован: ${skill.name}. ${skill.description}`);
     appendLog('\nПоражение. Вы вернулись в город.');
   }
 }
