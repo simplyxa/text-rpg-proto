@@ -212,6 +212,7 @@ function saveSessionState() {
   if (currentId && currentCharacter) {
     localStorage.setItem(STORAGE_ID_KEY, String(currentId));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCharacter));
+    window.updateExperienceBar?.(currentCharacter.xp, currentCharacter.xpToNext, currentCharacter.level);
   } else {
     localStorage.removeItem(STORAGE_ID_KEY);
     localStorage.removeItem(STORAGE_KEY);
