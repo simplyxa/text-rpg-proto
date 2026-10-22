@@ -16,8 +16,7 @@ function triggerLevelUpAnimation() {
 function updateExperienceBar(currentExp, maxExp, level) {
   const container = document.querySelector('.experience-bar-container');
   const fill = document.querySelector('.experience-bar-fill');
-  const percentageLabel = document.querySelector('.experience-percentage');
-  if (!container || !fill || !percentageLabel) return;
+  if (!container || !fill) return;
 
   const current = Number(currentExp);
   const maximum = Number(maxExp);
@@ -27,7 +26,6 @@ function updateExperienceBar(currentExp, maxExp, level) {
   const roundedPercentage = Math.round(percentage);
 
   fill.style.width = `${percentage}%`;
-  percentageLabel.textContent = `${roundedPercentage}%`;
   container.setAttribute('aria-valuenow', String(roundedPercentage));
 
   const nextLevel = level == null ? NaN : Number(level);
