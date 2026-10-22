@@ -10,6 +10,68 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+const EQUIPMENT_SLOTS = ['helmet', 'chest', 'shield', 'hands', 'armor', 'boots', 'cloak', 'ring'];
+
+function createEquipmentItem(id, name, slot, rarity, statBonus) {
+  return {
+    id,
+    name,
+    slot,
+    rarity,
+    statBonus: { str: 0, agi: 0, int: 0, maxHp: 0, ...statBonus },
+    icon: `/equipment-icons.svg#${slot}`
+  };
+}
+
+function createDefaultEquipment() {
+  return {
+    helmet: createEquipmentItem('iron_helmet', 'Железный шлем', 'helmet', 'common', { maxHp: 2 }),
+    chest: createEquipmentItem('chainmail', 'Кольчуга', 'chest', 'common', { str: 1 }),
+    shield: createEquipmentItem('wooden_shield', 'Деревянный щит', 'shield', 'common', { agi: 1 }),
+    hands: createEquipmentItem('leather_gloves', 'Кожаные перчатки', 'hands', 'common', { agi: 1 }),
+    armor: createEquipmentItem('plate_armor', 'Пластинчатый доспех', 'armor', 'rare', { str: 2, maxHp: 1 }),
+    boots: createEquipmentItem('leather_boots', 'Кожаные ботинки', 'boots', 'common', { agi: 1 }),
+    cloak: null,
+    ring: null
+  };
+}
+
+function createEquipmentInventory() {
+  return [
+    createEquipmentItem('dark_cloak', 'Плащ тьмы', 'cloak', 'epic', { int: 2, maxHp: 4 }),
+    createEquipmentItem('ring_of_power', 'Кольцо силы', 'ring', 'legendary', { str: 3, maxHp: 2 }),
+    createEquipmentItem('iron_gauntlets', 'Железные перчатки', 'hands', 'rare', { str: 1, agi: 1 }),
+    createEquipmentItem('travel_boots', 'Сапоги странника', 'boots', 'epic', { agi: 2, maxHp: 2 })
+  ];
+}
+
+function getEquipmentBonuses(equipment = {}) {
+  const bonuses = { str: 0, agi: 0, int: 0, maxHp: 0 };
+  for (const slot of EQUIPMENT_SLOTS) {
+    const item = equipment[slot];
+    if (!item || !item.statBonus) continue;
+    for (const stat of Object.keys(bonuses)) {
+      bonuses[stat] += Number(item.statBonus[stat]) || 0;
+    }
+  }
+  return bonuses;
+}
+
+function withEquipmentBonuses(character) {
+  if (!character) return character;
+  const bonuses = getEquipmentBonuses(character.equipment);
+  const maxHp = character.maxHp + bonuses.maxHp;
+  return {
+    ...character,
+    str: character.str + bonuses.str,
+    agi: character.agi + bonuses.agi,
+    int: character.int + bonuses.int,
+    maxHp,
+    hp: Math.min(character.hp, maxHp),
+    equipmentBonuses: bonuses
+  };
+}
+
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -78,8 +140,10 @@ function buildCharacter(name, classId, passwordHash, id = uid()) {
     kills: 0,
     inventory: [
       { id: 'potion', name: 'Зелье лечения', qty: 2, heal: 15 },
-      { id: 'food', name: 'Пирожок', qty: 1, heal: 8 }
+      { id: 'food', name: 'Пирожок', qty: 1, heal: 8 },
+      ...createEquipmentInventory()
     ],
+    equipment: createDefaultEquipment(),
     quests: createDefaultQuests(),
     passwordHash: passwordHash || null,
     createdAt: Date.now()
@@ -117,6 +181,7 @@ function serializeCharacter(character) {
     location: character.location,
     kills: character.kills,
     inventory: JSON.stringify(character.inventory || []),
+    equipment: JSON.stringify(character.equipment || createDefaultEquipment()),
     quests: JSON.stringify(character.quests || []),
     passwordHash: character.passwordHash || null,
     createdAt: character.createdAt || Date.now()
@@ -134,6 +199,19 @@ function deserializeCharacter(row) {
     ? row.quests
     : (typeof row.quests === 'string' ? JSON.parse(row.quests || JSON.stringify(createDefaultQuests())) : createDefaultQuests());
 
+  let equipment = row.equipment;
+  if (typeof equipment === 'string') {
+    try {
+      equipment = JSON.parse(equipment || '{}');
+    } catch {
+      equipment = {};
+    }
+  }
+  if (!equipment || typeof equipment !== 'object' || Array.isArray(equipment)) equipment = {};
+  for (const slot of EQUIPMENT_SLOTS) {
+    if (!(slot in equipment)) equipment[slot] = null;
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -150,6 +228,7 @@ function deserializeCharacter(row) {
     location: row.location,
     kills: row.kills,
     inventory,
+    equipment,
     quests,
     passwordHash: row.passwordhash || row.passwordHash,
     createdAt: row.createdat || row.createdAt
@@ -177,6 +256,7 @@ async function initDatabase() {
     'location TEXT',
     'kills INTEGER',
     'inventory TEXT',
+    'equipment TEXT',
     'quests TEXT',
     'passwordhash TEXT',
     'createdat BIGINT'
@@ -207,6 +287,7 @@ async function initDatabase() {
       location TEXT,
       kills INTEGER,
       inventory TEXT,
+      equipment TEXT,
       quests TEXT,
       passwordhash TEXT,
       createdat BIGINT
@@ -228,8 +309,8 @@ async function saveCharacter(character) {
   const row = serializeCharacter(character);
   await pool.query(
     `INSERT INTO characters (
-      id, name, classid, level, xp, xptonext, maxhp, hp, str, agi, int, gold, location, kills, inventory, quests, passwordhash, createdat
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      id, name, classid, level, xp, xptonext, maxhp, hp, str, agi, int, gold, location, kills, inventory, equipment, quests, passwordhash, createdat
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
       classid = EXCLUDED.classid,
@@ -245,6 +326,7 @@ async function saveCharacter(character) {
       location = EXCLUDED.location,
       kills = EXCLUDED.kills,
       inventory = EXCLUDED.inventory,
+      equipment = EXCLUDED.equipment,
       quests = EXCLUDED.quests,
       passwordhash = EXCLUDED.passwordhash,
       createdat = EXCLUDED.createdat`,
@@ -264,6 +346,7 @@ async function saveCharacter(character) {
       row.location,
       row.kills,
       row.inventory,
+      row.equipment,
       row.quests,
       row.passwordHash,
       row.createdAt
@@ -339,7 +422,7 @@ app.post('/api/registerCharacter', async (req, res) => {
 
   const character = buildCharacter(cleanName, finalClass, hashPassword(passwordValue));
   await saveCharacter(character);
-  res.json({ character: stripPassword(character), notice: 'Советуем придумать пароль к 10 уровню и не хранить его в открытом виде.' });
+  res.json({ character: stripPassword(withEquipmentBonuses(character)), notice: 'Советуем придумать пароль к 10 уровню и не хранить его в открытом виде.' });
 });
 
 app.post('/api/loginCharacter', async (req, res) => {
@@ -359,7 +442,7 @@ app.post('/api/loginCharacter', async (req, res) => {
     return res.status(401).json({ error: 'Неверный пароль.' });
   }
 
-  res.json({ character: stripPassword(stored) });
+  res.json({ character: stripPassword(withEquipmentBonuses(stored)) });
 });
 
 app.get('/api/character', async (req, res) => {
@@ -371,7 +454,7 @@ app.get('/api/character', async (req, res) => {
 
   updateQuests(char);
   await saveCharacter(char);
-  res.json({ character: stripPassword(char) });
+  res.json({ character: stripPassword(withEquipmentBonuses(char)) });
 });
 
 app.post('/api/travel', async (req, res) => {
@@ -388,7 +471,7 @@ app.post('/api/travel', async (req, res) => {
 
   char.location = to;
   await saveCharacter(char);
-  res.json({ location: loc, character: stripPassword(char) });
+  res.json({ location: loc, character: stripPassword(withEquipmentBonuses(char)) });
 });
 
 app.post('/api/fight', async (req, res) => {
@@ -404,7 +487,7 @@ app.post('/api/fight', async (req, res) => {
   const loc = locs.find((l) => l.id === char.location);
 
   if (!loc || !loc.monsters || loc.monsters.length === 0) {
-    return res.json({ message: 'Здесь нет врагов.', character: stripPassword(char) });
+    return res.json({ message: 'Здесь нет врагов.', character: stripPassword(withEquipmentBonuses(char)) });
   }
 
   const monsters = {
@@ -417,9 +500,11 @@ app.post('/api/fight', async (req, res) => {
   const monsterId = loc.monsters[randInt(0, loc.monsters.length - 1)];
   const monster = { ...monsters[monsterId] };
   const log = [];
+  const equipmentBonuses = getEquipmentBonuses(char.equipment);
+  const effectiveMaxHp = char.maxHp + equipmentBonuses.maxHp;
 
   while (char.hp > 0 && monster.hp > 0) {
-    const playerRoll = randInt(1, 6) + char.str + Math.floor(char.level / 2);
+    const playerRoll = randInt(1, 6) + char.str + equipmentBonuses.str + Math.floor(char.level / 2);
     const monsterRoll = randInt(1, 6) + Math.max(0, monster.def);
     const damage = Math.max(1, playerRoll - monsterRoll);
 
@@ -428,7 +513,7 @@ app.post('/api/fight', async (req, res) => {
 
     if (monster.hp <= 0) break;
 
-    const monsterDamage = Math.max(1, monster.atk + randInt(0, 3) - Math.floor(char.agi / 3));
+    const monsterDamage = Math.max(1, monster.atk + randInt(0, 3) - Math.floor((char.agi + equipmentBonuses.agi) / 3));
     char.hp -= monsterDamage;
     log.push(`${monster.name} наносит ${monsterDamage} урона ${char.name}.`);
   }
@@ -446,7 +531,7 @@ app.post('/api/fight', async (req, res) => {
       char.agi += 1;
       char.int += 1;
       char.maxHp += 5;
-      char.hp = char.maxHp;
+      char.hp = char.maxHp + equipmentBonuses.maxHp;
       char.xpToNext = Math.round(char.xpToNext * 1.4);
       log.push(`${char.name} достиг(ла) уровня ${char.level}!`);
     }
@@ -470,16 +555,59 @@ app.post('/api/fight', async (req, res) => {
     }
 
     await saveCharacter(char);
-    return res.json({ victory: true, log, character: stripPassword(char) });
+    return res.json({ victory: true, log, character: stripPassword(withEquipmentBonuses(char)) });
   }
 
-  char.hp = Math.max(1, Math.floor(char.maxHp / 2));
+  char.hp = Math.max(1, Math.floor(effectiveMaxHp / 2));
   char.gold = Math.max(0, char.gold - Math.floor(char.gold * 0.1));
   char.location = 'town';
   log.push(`${char.name} был(а) побежден(а), отступил(а) в город и потерял(а) часть золота.`);
 
   await saveCharacter(char);
-  res.json({ victory: false, log, character: stripPassword(char) });
+  res.json({ victory: false, log, character: stripPassword(withEquipmentBonuses(char)) });
+});
+
+app.get('/api/equipment', async (req, res) => {
+  const id = req.query.id;
+  if (!id) return res.status(400).json({ error: 'Нужно id персонажа.' });
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+  res.json({
+    equipment: char.equipment,
+    inventory: char.inventory.filter((item) => item.slot && EQUIPMENT_SLOTS.includes(item.slot)),
+    bonuses: getEquipmentBonuses(char.equipment)
+  });
+});
+
+app.post('/api/equipItem', async (req, res) => {
+  const { id, slot, itemId } = req.body;
+  if (!id || !EQUIPMENT_SLOTS.includes(slot)) {
+    return res.status(400).json({ error: 'Неверный персонаж или слот снаряжения.' });
+  }
+
+  const char = await loadCharacterById(id);
+  if (!char) return res.status(404).json({ error: 'Персонаж не найден.' });
+
+  const currentItem = char.equipment[slot];
+  if (itemId) {
+    const inventoryIndex = char.inventory.findIndex((item) => item.id === itemId && item.slot === slot);
+    if (inventoryIndex < 0) return res.status(400).json({ error: 'Предмет не найден в инвентаре или не подходит для этого слота.' });
+    const [nextItem] = char.inventory.splice(inventoryIndex, 1);
+    if (currentItem) char.inventory.push(currentItem);
+    char.equipment[slot] = nextItem;
+  } else {
+    if (currentItem) char.inventory.push(currentItem);
+    char.equipment[slot] = null;
+  }
+
+  char.hp = Math.min(char.hp, char.maxHp + getEquipmentBonuses(char.equipment).maxHp);
+  await saveCharacter(char);
+  res.json({
+    character: stripPassword(withEquipmentBonuses(char)),
+    equipment: char.equipment,
+    inventory: char.inventory.filter((item) => item.slot && EQUIPMENT_SLOTS.includes(item.slot)),
+    bonuses: getEquipmentBonuses(char.equipment)
+  });
 });
 
 app.get('/api/inventory', async (req, res) => {
@@ -499,11 +627,11 @@ app.post('/api/useItem', async (req, res) => {
 
   if (item.id === 'potion' || item.id === 'food') {
     const healed = item.heal || 10;
-    char.hp = Math.min(char.maxHp, char.hp + healed);
+    char.hp = Math.min(char.maxHp + getEquipmentBonuses(char.equipment).maxHp, char.hp + healed);
     item.qty -= 1;
     if (item.qty <= 0) char.inventory.splice(idx, 1);
     await saveCharacter(char);
-    return res.json({ message: `Использован ${item.name}. Восстановлено ${healed} HP.`, character: stripPassword(char) });
+    return res.json({ message: `Использован ${item.name}. Восстановлено ${healed} HP.`, character: stripPassword(withEquipmentBonuses(char)) });
   }
 
   return res.status(400).json({ error: '��тот предмет нельзя использовать.' });
@@ -531,7 +659,7 @@ app.post('/api/buyPotion', async (req, res) => {
   else char.inventory.push({ id: 'potion', name: 'Зелье лечения', qty: 1, heal: 15 });
 
   await saveCharacter(char);
-  res.json({ message: 'Куплено зелье лечения.', character: stripPassword(char) });
+  res.json({ message: 'Куплено зелье лечения.', character: stripPassword(withEquipmentBonuses(char)) });
 });
 
 const PORT = process.env.PORT || 3000;
